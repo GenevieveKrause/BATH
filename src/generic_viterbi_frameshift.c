@@ -910,6 +910,7 @@ main(int argc, char **argv)
   P7_HMMFILE     *hfp     = NULL;
   P7_HMM         *hmm     = NULL;
   P7_BG          *bgDNA   = NULL;
+  P7_PROFILE     *gm      = NULL;
   P7_FS_PROFILE  *gm_fs5  = NULL;
   P7_GMX         *gx      = NULL;
   P7_IVX         *iv      = NULL;
@@ -934,6 +935,9 @@ main(int argc, char **argv)
 
   gm_fs5 = p7_profile_fs_Create(hmm->M, abcAA, p7P_5CODONS);
   p7_ProfileConfig_fs(hmm, p7_bg_Create(abcAA), gcode, gm_fs5, L/3, p7_UNILOCAL);
+
+  gm = p7_profile_Create(hmm->M, abcAA);
+  p7_ProfileConfig(hmm, p7_bg_Create(abcAA), gm, gcode, L, p7_UNILOCAL, TRUE, TRUE);
 
   gx = p7_gmx_Create(gm_fs5->M, L, L, p7G_NSCELLS_FS);
   iv = p7_ivx_Create(gm_fs5->M, p7P_5CODONS);
@@ -976,11 +980,30 @@ main(int argc, char **argv)
   printf("# L    = %d\n", L);
   printf("# %.1f Mc/s\n", Mcs);
 
+  esl_stopwatch_Start(w);
+  for (i = 0; i < N; i++)
+    {
+      esl_rsq_xfIID(r, bgDNA->f, abcDNA->K, L, dsq);
+
+      p7_GViterbi_Frameshift_New(dsq, L, gm, gx, iv, &sc);
+
+      p7_gmx_Reuse(gx);
+    }
+  esl_stopwatch_Stop(w);
+
+  bench_time = w->user - base_time;
+  Mcs        = (double) N * (double) L * (double) gm_fs5->M * 1e-6 / (double) bench_time;
+  esl_stopwatch_Display(stdout, w, "# CPU time: ");
+  printf("# M    = %d\n", gm_fs5->M);
+  printf("# L    = %d\n", L);
+  printf("# %.1f Mc/s\n", Mcs);
+
   free(dsq);
   p7_trace_fs_Destroy(tr);
   p7_ivx_Destroy(iv);
   p7_gmx_Destroy(gx);
   p7_profile_fs_Destroy(gm_fs5);
+  p7_profile_Destroy(gm);
   p7_bg_Destroy(bgDNA);
   p7_hmm_Destroy(hmm);
   p7_hmmfile_Close(hfp);
@@ -1069,7 +1092,7 @@ utest_viterbi_fs(ESL_GETOPTS *go, ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA, ESL_AL
       p7_gmx_Reuse(vit);
 
 	  if (p7_GViterbi_Frameshift_New(dsqDNA, L, gm, vit, iv, &new_vsc) != eslOK) esl_fatal("New Viterbi failed");
-      printf("vsc %f new_vsc %f\n", vsc, new_vsc);
+      
       p7_gmx_Reuse(vit); 
 	    
       p7_gmx_Reuse(fwd);
