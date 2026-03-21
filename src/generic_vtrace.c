@@ -230,7 +230,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abc);
   p7_bg_SetLength(bg, sq->n);
   gm = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, sq->n, p7_LOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_LOCAL, FALSE, FALSE);
   
   /* Allocate matrix and a trace */
   fwd = p7_gmx_Create(gm->M, sq->n);

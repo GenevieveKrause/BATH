@@ -1761,7 +1761,7 @@ p7_oprofile_Sample(ESL_RANDOMNESS *r, const ESL_ALPHABET *abc, const P7_BG *bg, 
   if ((om = p7_oprofile_Create(M, abc)) == NULL)  { status = eslEMEM; goto ERROR; }
 
   if ((status = p7_hmm_Sample(r, M, abc, &hmm))             != eslOK) goto ERROR;
-  if ((status = p7_ProfileConfig(hmm, bg, gm, L, p7_LOCAL)) != eslOK) goto ERROR;
+  if ((status = p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_LOCAL, FALSE, FALSE)) != eslOK) goto ERROR;
   if ((status = p7_oprofile_Convert(gm, om))                != eslOK) goto ERROR;
   if ((status = p7_oprofile_ReconfigLength(om, L))          != eslOK) goto ERROR;
 
@@ -2047,7 +2047,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abc);
   p7_bg_SetLength(bg, L);
   gm = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, L, p7_LOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_LOCAL, FALSE, FALSE);
   om = p7_oprofile_Create(gm->M, abc);
 
   esl_stopwatch_Start(w);
@@ -2136,7 +2136,7 @@ main(int argc, char **argv)
   bg  = p7_bg_Create(abc);
   gm  = p7_profile_Create(hmm->M, abc);
   om1 = p7_oprofile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, 400, p7_LOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, 400, p7_LOCAL, FALSE, FALSE);
   p7_oprofile_Convert(gm, om1);
 
   p7_oprofile_Dump(stdout, om1);

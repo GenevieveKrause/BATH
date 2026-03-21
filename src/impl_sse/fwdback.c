@@ -810,7 +810,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abc);
   p7_bg_SetLength(bg, L);
   gm = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, L, p7_LOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_LOCAL, FALSE, FALSE);
   om = p7_oprofile_Create(gm->M, abc);
   p7_oprofile_Convert(gm, om);
   p7_oprofile_ReconfigLength(om, L);
@@ -1103,10 +1103,10 @@ main(int argc, char **argv)
   gm = p7_profile_Create(hmm->M, abc); 
 
   /* Now reconfig the models however we were asked to */
-  if      (esl_opt_GetBoolean(go, "--fs"))  p7_ProfileConfig(hmm, bg, gm, sq->n, p7_LOCAL);
-  else if (esl_opt_GetBoolean(go, "--sw"))  p7_ProfileConfig(hmm, bg, gm, sq->n, p7_UNILOCAL);
-  else if (esl_opt_GetBoolean(go, "--ls"))  p7_ProfileConfig(hmm, bg, gm, sq->n, p7_GLOCAL);
-  else if (esl_opt_GetBoolean(go, "--s"))   p7_ProfileConfig(hmm, bg, gm, sq->n, p7_UNIGLOCAL);
+  if      (esl_opt_GetBoolean(go, "--fs"))  p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_LOCAL, FALSE, FALSE);
+  else if (esl_opt_GetBoolean(go, "--sw"))  p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_UNILOCAL, FALSE, FALSE);
+  else if (esl_opt_GetBoolean(go, "--ls"))  p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_GLOCAL, FALSE, FALSE);
+  else if (esl_opt_GetBoolean(go, "--s"))   p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_UNIGLOCAL, FALSE, FALSE);
 
   /* now the optimized profile */
   om = p7_oprofile_Create(gm->M, abc);

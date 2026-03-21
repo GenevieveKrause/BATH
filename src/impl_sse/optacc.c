@@ -498,7 +498,7 @@ main(int argc, char **argv)
   if (p7_hmmfile_Read(hfp, &abc, &hmm)            != eslOK) p7_Fail("Failed to read HMM");
 
   bg = p7_bg_Create(abc);                 p7_bg_SetLength(bg, L);
-  gm = p7_profile_Create(hmm->M, abc);    p7_ProfileConfig(hmm, bg, gm, L, p7_LOCAL);
+  gm = p7_profile_Create(hmm->M, abc);    p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_LOCAL, FALSE, FALSE);
   om = p7_oprofile_Create(gm->M, abc);    p7_oprofile_Convert(gm, om);
   p7_oprofile_ReconfigLength(om, L);
 
@@ -894,7 +894,7 @@ main(int argc, char **argv)
  
   /* Configure a profile from the HMM */
   bg = p7_bg_Create(abc);                 p7_bg_SetLength(bg, sq->n);
-  gm = p7_profile_Create(hmm->M, abc);    p7_ProfileConfig(hmm, bg, gm, sq->n, p7_LOCAL); /* multihit local: H3 default */
+  gm = p7_profile_Create(hmm->M, abc);    p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_LOCAL, FALSE, FALSE); /* multihit local: H3 default */
   om = p7_oprofile_Create(gm->M, abc);    p7_oprofile_Convert(gm, om);
 
   /* Allocations */

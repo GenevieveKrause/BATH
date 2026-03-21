@@ -251,7 +251,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abc);
   p7_bg_SetLength(bg, L);
   gm = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, L, p7_UNILOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_UNILOCAL, FALSE, FALSE);
   fwd = p7_gmx_Create(gm->M, L, L, p7G_NSCELLS);
   tr  = p7_trace_Create();
   esl_rsq_xfIID(r, bg->f, abc->K, L, dsq);
@@ -380,7 +380,7 @@ main(int argc, char **argv)
   if (p7_hmm_Sample(r, M, abc, &hmm)                != eslOK) esl_fatal("failed to sample an HMM");
   if ((bg = p7_bg_Create(abc))                      == NULL)  esl_fatal("failed to create null model");
   if ((gm = p7_profile_Create(hmm->M, abc))         == NULL)  esl_fatal("failed to create profile");
-  if (p7_ProfileConfig(hmm, bg, gm, L, p7_LOCAL)    != eslOK) esl_fatal("failed to config profile");
+  if (p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_LOCAL, FALSE, FALSE)    != eslOK) esl_fatal("failed to config profile");
 
   /* Test with randomly generated (iid) sequence */
   if ((dsq = malloc(sizeof(ESL_DSQ) *(L+2)))  == NULL)  esl_fatal("malloc failed");
@@ -481,7 +481,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abc);
   p7_bg_SetLength(bg, sq->n);
   gm = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, sq->n, p7_LOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_LOCAL, FALSE, FALSE);
 
   fwd = p7_gmx_Create(gm->M, sq->n, sq->n, p7G_NSCELLS);
   tr  = p7_trace_Create();

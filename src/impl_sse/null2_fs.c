@@ -194,7 +194,7 @@ utest_null2_fs_expectation(ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA, ESL_ALPHABET 
   if (!gn2 || !on2) esl_fatal(msg);
 
   p7_hmm_Sample(r, M, abcAA, &hmm);
-  p7_ProfileConfig(hmm, bgAA, gm, M, p7_LOCAL);
+  p7_ProfileConfig(hmm, bgAA, gm, NULL, M, p7_LOCAL, FALSE, FALSE);
   p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs5, M, p7_LOCAL);
   p7_fs_oprofile_Convert(gm_fs5, om_fs5);
 

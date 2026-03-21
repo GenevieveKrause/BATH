@@ -97,11 +97,11 @@ main(int argc, char **argv)
 
       /* Config the reference model the same way */
       gmref = p7_profile_Create(hmm->M, abc);
-      if      (esl_opt_GetBoolean(go, "--dd"))  status = p7_ProfileConfig(hmm, bg, gmref, sq->n, p7_UNIGLOCAL);
-      else if (esl_opt_GetBoolean(go, "--fs"))  status = p7_ProfileConfig(hmm, bg, gmref, sq->n, p7_LOCAL);
-      else if (esl_opt_GetBoolean(go, "--sw"))  status = p7_ProfileConfig(hmm, bg, gmref, sq->n, p7_UNILOCAL);
-      else if (esl_opt_GetBoolean(go, "--ls"))  status = p7_ProfileConfig(hmm, bg, gmref, sq->n, p7_GLOCAL);
-      else if (esl_opt_GetBoolean(go, "--s"))   status = p7_ProfileConfig(hmm, bg, gmref, sq->n, p7_UNIGLOCAL);
+      if      (esl_opt_GetBoolean(go, "--dd"))  status = p7_ProfileConfig(hmm, bg, gmref, NULL, sq->n, p7_UNIGLOCAL, FALSE, FALSE);
+      else if (esl_opt_GetBoolean(go, "--fs"))  status = p7_ProfileConfig(hmm, bg, gmref, NULL, sq->n, p7_LOCAL, FALSE, FALSE);
+      else if (esl_opt_GetBoolean(go, "--sw"))  status = p7_ProfileConfig(hmm, bg, gmref, NULL, sq->n, p7_UNILOCAL, FALSE, FALSE);
+      else if (esl_opt_GetBoolean(go, "--ls"))  status = p7_ProfileConfig(hmm, bg, gmref, NULL, sq->n, p7_GLOCAL, FALSE, FALSE);
+      else if (esl_opt_GetBoolean(go, "--s"))   status = p7_ProfileConfig(hmm, bg, gmref, NULL, sq->n, p7_UNIGLOCAL, FALSE, FALSE);
 
       fwd    = p7_gmx_Create(gm->M,    400);
       fwdref = p7_gmx_Create(gmref->M, 400);

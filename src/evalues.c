@@ -106,7 +106,7 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
    */
   if ((esl_byp_IsInternal(byp_gm) && ! esl_byp_IsProvided(byp_om)) || esl_byp_IsReturned(byp_gm)) {
     if  ( (gm     = p7_profile_Create(hmm->M, hmm->abc))          == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate profile");
-    if  ( (status = p7_ProfileConfig(hmm, bg, gm, EvL, p7_LOCAL)) != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure profile");
+    if  ( (status = p7_ProfileConfig(hmm, bg, gm, NULL, EvL, p7_LOCAL, FALSE, FALSE)) != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure profile");
   }
 
   if (om == NULL) {
@@ -870,7 +870,7 @@ main(int argc, char **argv)
 
       if (bg == NULL) bg = p7_bg_Create(abc);
       gm = p7_profile_Create(hmm->M, abc);
-      p7_ProfileConfig(hmm, bg, gm, EvL, p7_LOCAL); /* the EvL doesn't matter */
+      p7_ProfileConfig(hmm, bg, gm, NULL, EvL, p7_LOCAL, FALSE, FALSE); /* the EvL doesn't matter */
       om = p7_oprofile_Create(hmm->M, abc);
       p7_oprofile_Convert(gm, om);
 

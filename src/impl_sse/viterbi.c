@@ -500,7 +500,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abc);
   p7_bg_SetLength(bg, L);
   gm = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, L, p7_UNILOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_UNILOCAL, FALSE, FALSE);
   om = p7_oprofile_Create(gm->M, abc);
   p7_oprofile_Convert(gm, om);
   p7_oprofile_ReconfigLength(om, L);

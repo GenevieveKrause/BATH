@@ -254,7 +254,7 @@ p7_tracealign_computeTraces(P7_HMM *hmm, ESL_SQ  **sq, int offset, int N, P7_TRA
   gm = p7_profile_Create (hmm->M, hmm->abc);
   om = p7_oprofile_Create(hmm->M, hmm->abc);
 
-  p7_ProfileConfig(hmm, bg, gm, sq[offset]->n, p7_UNILOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, sq[offset]->n, p7_UNILOCAL, FALSE, FALSE);
   p7_oprofile_Convert(gm, om);
 
 

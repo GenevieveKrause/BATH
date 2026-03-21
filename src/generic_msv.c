@@ -314,7 +314,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abc);
   p7_bg_SetLength(bg, L);
   gm = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, L, p7_UNILOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_UNILOCAL, FALSE, FALSE);
   gx = p7_gmx_Create(gm->M, L, L, p7G_NSCELLS);
 
   /* Baseline time. */
@@ -444,7 +444,7 @@ main(int argc, char **argv)
   if (p7_hmm_Sample(r, M, abc, &hmm)                != eslOK) esl_fatal("failed to sample an HMM");
   if ((bg = p7_bg_Create(abc))                      == NULL)  esl_fatal("failed to create null model");
   if ((gm = p7_profile_Create(hmm->M, abc))         == NULL)  esl_fatal("failed to create profile");
-  if (p7_ProfileConfig(hmm, bg, gm, L, p7_LOCAL)    != eslOK) esl_fatal("failed to config profile");
+  if (p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_LOCAL, FALSE, FALSE)    != eslOK) esl_fatal("failed to config profile");
   if (p7_hmm_Validate    (hmm, errbuf, 0.0001)      != eslOK) esl_fatal("whoops, HMM is bad!: %s", errbuf);
   if (p7_profile_Validate(gm,  errbuf, 0.0001)      != eslOK) esl_fatal("whoops, profile is bad!: %s", errbuf);
 
@@ -526,7 +526,7 @@ main(int argc, char **argv)
   /* Configure a profile from the HMM */
   bg = p7_bg_Create(abc);
   gm = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, sq->n, p7_LOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_LOCAL, FALSE, FALSE);
 
   /* Allocate matrix */
   fwd = p7_gmx_Create(gm->M, sq->n, sq->n, p7G_NSCELLS);

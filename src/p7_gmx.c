@@ -579,7 +579,7 @@ main(int argc, char **argv)
   if (p7_hmm_Sample(r, M, abc, &hmm)                != eslOK) esl_fatal(msg);
   if ((gm = p7_profile_Create(hmm->M, abc))         == NULL)  esl_fatal(msg);
   if (p7_bg_SetLength(bg, L)                        != eslOK) esl_fatal(msg);
-  if (p7_ProfileConfig(hmm, bg, gm, L, p7_UNILOCAL) != eslOK) esl_fatal(msg);
+  if (p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_UNILOCAL, FALSE, FALSE) != eslOK) esl_fatal(msg);
 
   utest_GrowTo();
   utest_Compare(r, gm, bg, L, tol);

@@ -242,7 +242,7 @@ emit_sequences(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNESS *r, P7_HMM
   if ((bg = p7_bg_Create(hmm->abc))              == NULL)  esl_fatal("failed to create null model");
   if ((gm = p7_profile_Create(hmm->M, hmm->abc)) == NULL)  esl_fatal("failed to create profile");
 
-  if (p7_ProfileConfig(hmm, bg, gm, L, mode)     != eslOK) esl_fatal("failed to configure profile");
+  if (p7_ProfileConfig(hmm, bg, gm, NULL, L, mode, FALSE, FALSE)     != eslOK) esl_fatal("failed to configure profile");
   if (p7_bg_SetLength(bg, L)                     != eslOK) esl_fatal("failed to reconfig null model length");
   if (p7_hmm_Validate    (hmm, NULL, 0.0001)     != eslOK) esl_fatal("whoops, HMM is bad!");
   if (p7_profile_Validate(gm,  NULL, 0.0001)     != eslOK) esl_fatal("whoops, profile is bad!");

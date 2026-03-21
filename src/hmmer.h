@@ -282,6 +282,7 @@ enum p7p_ivx_codon {
 #define p7P_MAXCODONS5     1367    /* 4^1 + 4^2 + 4^3 + 4^4 + 4^5 + 3 (final 3 for codons with non-cononcial nucleotides) */ 
 #define p7P_MAXCODONS3     338     /* 4^2 + 4^3 + 4^4 + 2 (final 2 for codons with non-cononcial nucleotides)*/
 #define p7P_MAXCODONS1     65      /* 4^3 + 1 */
+#define p7P_MAXCODONS      65
 #define p7P_DEGEN5_C       1364    /* index for degnerate codon (5 codon lengths)*/
 #define p7P_DEGEN5_QC1     1365    /* index for degnerate quasicodons with one indel (5 codon lengths) */
 #define p7P_DEGEN5_QC2     1366    /* index for degnerate quasicodons with two indels (5 codon lengths) */
@@ -302,6 +303,9 @@ enum p7p_ivx_codon {
 #define p7P_NUC1_FS1       16
 #define p7P_NUC2_FS1       4
 
+#define p7P_NUC1           16
+#define p7P_NUC2            4
+
 /* find the correct emmisions array index of a codon or quasicodon */
 #define p7P_CODON1_FS5(x)             ((x) * p7P_NUC1_FS5) 
 #define p7P_CODON2_FS5(w, x)          ((x) * p7P_NUC1_FS5 + (w) * p7P_NUC2_FS5 + p7P_C2)
@@ -316,6 +320,9 @@ enum p7p_ivx_codon {
 #define p7P_CODON3_FS1(v, w, x)        ((x) * p7P_NUC1_FS1 + (w) * p7P_NUC2_FS1 + (v))
 
 #define p7P_MINIDX(a,b)           ((b) ^ (((a) ^ (b)) & -((a) < (b))))  
+
+#define p7P_CODON(v, w, x)        (p7P_NUC1*(v) + p7P_NUC2*(w) + (x))
+#define p7P_AA(gm, x)                 ((gm)->codons[(x)])
 
 /* Accessing codon translations */
 #define p7P_AMINO(gm, k, x)       ((gm)->codons[(k)][(x)])
@@ -344,6 +351,9 @@ typedef struct p7_profile_s {
   int     M;                              /* number of nodes in the model                            */
   int     max_length;                     /* calculated upper bound on emitted seq length            */
   float   nj;                             /* expected # of uses of J; precalculated from loop config */
+  float   fsprob;                         /* frameshift probability for frameshift aware functions   */
+  int     fs;                             /* bool for frameshift-aware length model                  */
+  int     stops;                          /* bool to disallow stop codons for translated functions   */
 
   /* Info, most of which is a copy from parent HMM:                                                 */
   char  *name;                            /* unique name of model                                   */
@@ -363,6 +373,7 @@ typedef struct p7_profile_s {
   off_t  roff;                            /* record offset (start of record); -1 if none            */
   off_t  eoff;                            /* offset to last byte of record; -1 if unknown           */
 
+  ESL_DSQ *codons;                       /* Codon -> Amino Acid translations [p7P_MAXCODONS][0.1..M] */
   const ESL_ALPHABET *abc;                /* copy of pointer to appropriate alphabet                */
   
 } P7_PROFILE;
@@ -407,6 +418,7 @@ typedef struct p7_fs_profile_s {
   const ESL_ALPHABET *abc;                /* copy of pointer to appropriate alphabet                          */
  
 } P7_FS_PROFILE;
+
 
 /*****************************************************************
  * 3. P7_BG: a null (background) model.
@@ -1313,6 +1325,7 @@ extern int p7_GViterbi     (const ESL_DSQ *dsq, int L, const P7_PROFILE *gm,    
 extern int p7_GTrace       (const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, const P7_GMX *gx, P7_TRACE *tr);
 
 /* generic_viterbi_frameshift.c */
+extern int p7_GViterbi_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_GMX *gx, P7_IVX *iv, float *opt_sc);
 extern int p7_GViterbi_Frameshift(const ESL_DSQ *dsq, int L, const P7_FS_PROFILE *gm_fs5, P7_GMX *gx, P7_IVX *iv, float *opt_sc);
 extern int p7_GVTrace_Frameshift(const ESL_DSQ *dsq, int L, const P7_FS_PROFILE *gm_fs5, const P7_GMX *gx, P7_TRACE *tr); 
 
@@ -1365,7 +1378,7 @@ extern int   p7_ILogsum(int s1, int s2);
 
 
 /* modelconfig.c */
-extern int p7_ProfileConfig(const P7_HMM *hmm, const P7_BG *bg, P7_PROFILE *gm, int L, int mode);
+extern int p7_ProfileConfig(const P7_HMM *hmm, const P7_BG *bg, P7_PROFILE *gm, const ESL_GENCODE *gcode, int L, int mode, int fs, int stops);
 extern int p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode, P7_FS_PROFILE *gm_fs, int L_amino, int mode);
 extern int p7_ReconfigLength  (P7_PROFILE *gm, int L);
 extern int p7_fs_ReconfigLength  (P7_FS_PROFILE *gm_fs, int L_amino);

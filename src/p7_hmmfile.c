@@ -2380,7 +2380,7 @@ main(int argc, char **argv)
       if (esl_opt_GetBoolean(go, "-a") == TRUE) 
   {
     gm = p7_profile_Create(hmm->M, abc);
-    p7_ProfileConfig(hmm, bg, gm, 400, p7_LOCAL);
+    p7_ProfileConfig(hmm, bg, gm, NULL, 400, p7_LOCAL, FALSE, FALSE);
     om = p7_oprofile_Create(gm->M, abc);
     p7_oprofile_Convert(gm, om);
     p7_oprofile_ReconfigLength(om, 400);

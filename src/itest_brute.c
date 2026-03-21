@@ -358,8 +358,8 @@ create_brute_profile(struct p7_bruteparam_s *prm, P7_HMM *hmm, P7_BG *bg, int do
 
   gm = p7_profile_Create(hmm->M, hmm->abc);
 
-  if (do_local) p7_ProfileConfig(hmm, bg, gm, 100, p7_UNILOCAL);  /* only local vs. glocal matters... */
-  else          p7_ProfileConfig(hmm, bg, gm, 100, p7_UNIGLOCAL); /* all else will be replaced.       */
+  if (do_local) p7_ProfileConfig(hmm, bg, gm, NULL, 100, p7_UNILOCAL, FALSE, FALSE);  /* only local vs. glocal matters... */
+  else          p7_ProfileConfig(hmm, bg, gm, NULL, 100, p7_UNIGLOCAL, FALSE, FALSE); /* all else will be replaced.       */
 
   if (do_local) 
     {	/* local modes: uniform but weighted by match occupancy;

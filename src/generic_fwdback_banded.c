@@ -177,7 +177,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abc);
   p7_bg_SetLength(bg, L);
   gm = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, L, p7_GLOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_GLOCAL, FALSE, FALSE);
 
   /* Contrive bands: one length M band of width W */
   bnd = p7_gbands_Create(L, gm->M);

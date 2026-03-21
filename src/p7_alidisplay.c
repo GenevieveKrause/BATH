@@ -4536,7 +4536,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abcAA);
   p7_bg_SetLength(bg, 0);
   gm = p7_profile_Create(hmm->M, abcAA);
-  p7_ProfileConfig(hmm, bg, gm, 0, p7_UNIGLOCAL); /* that sets N,C,J to generate nothing */
+  p7_ProfileConfig(hmm, bg, gm, NULL, 0, p7_UNIGLOCAL, FALSE, FALSE); /* that sets N,C,J to generate nothing */
   om = p7_oprofile_Create(gm->M, abcAA);
   p7_oprofile_Convert(gm, om);
 

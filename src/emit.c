@@ -479,7 +479,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abc);
   gm = p7_profile_Create(hmm->M, abc);
 
-  p7_ProfileConfig(hmm, bg, gm, sq->n, p7_LOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_LOCAL, FALSE, FALSE);
 
   for (i = 0; i < n; i++) 
     {
@@ -571,7 +571,7 @@ main(int argc, char **argv)
   p7_hmmfile_Close(hfp);
 
   bg = p7_bg_Create(abc);                p7_bg_SetLength(bg, L);
-  gm = p7_profile_Create(hmm->M, abc);   p7_ProfileConfig(hmm, bg, gm, L, p7_LOCAL);
+  gm = p7_profile_Create(hmm->M, abc);   p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_LOCAL, FALSE, FALSE);
   sq = esl_sq_CreateDigital(abc);
 
   for (i = 0; i < N; i++)

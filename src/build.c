@@ -631,7 +631,7 @@ main(int argc, char **argv)
 
       /* Just so we can dump a more informatively annotated trace - build a profile */
       gm = p7_profile_Create(hmm->M, abc);
-      p7_ProfileConfig(hmm, bg, gm, 400, p7_LOCAL);
+      p7_ProfileConfig(hmm, bg, gm, NULL, 400, p7_LOCAL, FALSE, FALSE);
 
       /* Dump the individual traces */
       for (i = 0; i < msa->nseq; i++)

@@ -1044,7 +1044,7 @@ p7_hmm_SampleUngapped(ESL_RANDOMNESS *r, int M, const ESL_ALPHABET *abc, P7_HMM 
  *            
  *            To achieve this in the profile as well as the core HMM,
  *            the caller must configure a unihit mode
- *            (<p7_ProfileConfig(hmm, bg, gm, p7_UNILOCAL)> or
+ *            (<p7_ProfileConfig(hmm, bg, gm, NULL, p7_UNILOCAL, FALSE, FALSE)> or
  *            <p7_UNIGLOCAL>), and a target length of zero
  *            (<p7_ReconfigLength(gm, 0)>).
  *            

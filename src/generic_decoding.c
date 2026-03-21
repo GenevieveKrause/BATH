@@ -288,7 +288,7 @@ main(int argc, char **argv)
   if (p7_hmmfile_Read(hfp, &abc, &hmm)            != eslOK) p7_Fail("Failed to read HMM");
 
   bg = p7_bg_Create(abc);                 p7_bg_SetLength(bg, L);
-  gm = p7_profile_Create(hmm->M, abc);    p7_ProfileConfig(hmm, bg, gm, L, p7_LOCAL);
+  gm = p7_profile_Create(hmm->M, abc);    p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_LOCAL, FALSE, FALSE);
   fwd = p7_gmx_Create(gm->M, L, L, p7G_NSCELLS);  
   bck = p7_gmx_Create(gm->M, L, L, p7G_NSCELLS);
   pp  = p7_gmx_Create(gm->M, L, L, p7G_NSCELLS);
@@ -414,10 +414,10 @@ main(int argc, char **argv)
   gm = p7_profile_Create(hmm->M, abc);
 
   /* Now reconfig the model however we were asked to */
-  if      (esl_opt_GetBoolean(go, "--fs"))  p7_ProfileConfig(hmm, bg, gm, sq->n, p7_LOCAL);
-  else if (esl_opt_GetBoolean(go, "--sw"))  p7_ProfileConfig(hmm, bg, gm, sq->n, p7_UNILOCAL);
-  else if (esl_opt_GetBoolean(go, "--ls"))  p7_ProfileConfig(hmm, bg, gm, sq->n, p7_GLOCAL);
-  else if (esl_opt_GetBoolean(go, "--s"))   p7_ProfileConfig(hmm, bg, gm, sq->n, p7_UNIGLOCAL);
+  if      (esl_opt_GetBoolean(go, "--fs"))  p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_LOCAL, FALSE, FALSE);
+  else if (esl_opt_GetBoolean(go, "--sw"))  p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_UNILOCAL, FALSE, FALSE);
+  else if (esl_opt_GetBoolean(go, "--ls"))  p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_GLOCAL, FALSE, FALSE);
+  else if (esl_opt_GetBoolean(go, "--s"))   p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_UNIGLOCAL, FALSE, FALSE);
   
   /* Allocate matrices */
   fwd = p7_gmx_Create(gm->M, sq->n, sq->n, p7G_NSCELLS);

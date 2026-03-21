@@ -432,7 +432,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abc);
   p7_bg_SetLength(bg, L);
   gm = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, L, p7_UNILOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_UNILOCAL, FALSE, FALSE);
   gx1 = p7_gmx_Create(gm->M, L, L, p7G_NSCELLS);
   gx2 = p7_gmx_Create(gm->M, L, L, p7G_NSCELLS);
   tr  = p7_trace_CreateWithPP();
@@ -566,7 +566,7 @@ main(int argc, char **argv)
   bg = p7_bg_Create(abc);
   p7_bg_SetLength(bg, sq->n);
   gm = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm, sq->n, p7_LOCAL); /* multihit local: H3 default */
+  p7_ProfileConfig(hmm, bg, gm, NULL, sq->n, p7_LOCAL, FALSE, FALSE); /* multihit local: H3 default */
   
   /* Allocations */
   gx1 = p7_gmx_Create(gm->M, sq->n, sq->n, p7G_NSCELLS);
