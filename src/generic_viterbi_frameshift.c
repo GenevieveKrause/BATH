@@ -65,7 +65,7 @@ p7_GViterbi_Frameshift(const ESL_DSQ *dsq, int L, const P7_FS_PROFILE *gm_fs5, P
   int          c1, c2, c3, c4, c5;
   int          t, u, v, w, x;
   int          ivx_1, ivx_2, ivx_3, ivx_4, ivx_5;
-  float        esc  = p7_profile_IsLocal(gm_fs5) ? 0 : -eslINFINITY;
+  float        esc  = p7_fs_profile_IsLocal(gm_fs5) ? 0 : -eslINFINITY;
 
   if(gm_fs5->codon_lengths != 5) ESL_EXCEPTION(eslEINVAL, "proflie not allocated for 5 codon lengths");
   
