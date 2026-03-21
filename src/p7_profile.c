@@ -63,7 +63,8 @@ p7_profile_Create(int allocM, const ESL_ALPHABET *abc)
   gm->mm        = NULL;
   gm->cs        = NULL;
   gm->consensus = NULL;
-  
+  gm->codons    = NULL;  
+
   /* level 1 */
   ESL_ALLOC(gm->tsc,       sizeof(float)   * allocM * p7P_NTRANS); 
   ESL_ALLOC(gm->rsc,       sizeof(float *) * abc->Kp);
@@ -71,6 +72,7 @@ p7_profile_Create(int allocM, const ESL_ALPHABET *abc)
   ESL_ALLOC(gm->mm,        sizeof(char)    * (allocM+2));
   ESL_ALLOC(gm->cs,        sizeof(char)    * (allocM+2));
   ESL_ALLOC(gm->consensus, sizeof(char)    * (allocM+2));
+  ESL_ALLOC(gm->codons,    sizeof(ESL_DSQ) * p7P_MAXCODONS);
   gm->rsc[0] = NULL;
   
   /* level 2 */
@@ -103,6 +105,10 @@ p7_profile_Create(int allocM, const ESL_ALPHABET *abc)
   gm->M                = 0;
   gm->max_length       = -1;
   gm->nj               = 0.0f;
+
+  gm->fs               = 0;
+  gm->stops            = 0;
+  gm->fsprob           = 0.0f;
 
   gm->roff             = -1;
   gm->eoff             = -1;
@@ -280,6 +286,9 @@ p7_profile_Copy(const P7_PROFILE *src, P7_PROFILE *dst)
   dst->M           = src->M;
   dst->max_length  = src->max_length;
   dst->nj          = src->nj;
+  dst->fsprob      = src->fsprob;
+  dst->fs          = src->fs;
+  dst->stops       = src->stops;
 
   dst->roff        = src->roff;
   dst->eoff        = src->eoff;
@@ -297,6 +306,8 @@ p7_profile_Copy(const P7_PROFILE *src, P7_PROFILE *dst)
   strcpy(dst->mm,        src->mm);         /* MM is also optional annotation */
   strcpy(dst->cs,        src->cs);         /* CS is also optional annotation */
   strcpy(dst->consensus, src->consensus);  /* consensus though is always present on a valid profile */
+
+  memcpy(dst->codons, src->codons, sizeof(ESL_DSQ) * p7P_MAXCODONS);
 
   for (z = 0; z < p7_NEVPARAM; z++) dst->evparam[z] = src->evparam[z];
   for (z = 0; z < p7_NCUTOFFS; z++) dst->cutoff[z]  = src->cutoff[z];
@@ -522,12 +533,12 @@ p7_profile_Sizeof(P7_PROFILE *gm)
   /* these mirror malloc()'s in p7_profile_Create(); maintain one:one correspondence for maintainability */
   n += sizeof(P7_PROFILE);
   n += sizeof(float)   * gm->allocM * p7P_NTRANS;             /* gm->tsc       */
-  n += sizeof(float *) * gm->abc->Kp;                        /* gm->rsc       */
-  n += sizeof(char)    * (gm->allocM+2);                /* gm->rf        */
-  n += sizeof(char)    * (gm->allocM+2);                /* gm->mm        */
-  n += sizeof(char)    * (gm->allocM+2);                /* gm->cs        */
-  n += sizeof(char)    * (gm->allocM+2);                /* gm->consensus */
-
+  n += sizeof(float *) * gm->abc->Kp;                         /* gm->rsc       */
+  n += sizeof(char)    * (gm->allocM+2);                      /* gm->rf        */
+  n += sizeof(char)    * (gm->allocM+2);                      /* gm->mm        */
+  n += sizeof(char)    * (gm->allocM+2);                      /* gm->cs        */
+  n += sizeof(char)    * (gm->allocM+2);                      /* gm->consensus */
+  n += sizeof(ESL_DSQ) * p7P_MAXCODONS;                       /* gm->codons    */
   n += sizeof(float) * gm->abc->Kp * (gm->allocM+1) * p7P_NR; /* gm->rsc[0]    */
 
   return n;
@@ -557,6 +568,7 @@ p7_profile_Destroy(P7_PROFILE *gm)
     if (gm->mm        != NULL) free(gm->mm);
     if (gm->cs        != NULL) free(gm->cs);
     if (gm->consensus != NULL) free(gm->consensus);
+	if (gm->codons    != NULL) free(gm->codons);
     free(gm);
   }
   return;
@@ -1034,8 +1046,8 @@ utest_Compare(void)
   bg  = p7_bg_Create(abc);
   gm  = p7_profile_Create(hmm->M, abc);
   gm2 = p7_profile_Create(hmm->M, abc);
-  p7_ProfileConfig(hmm, bg, gm,  400, p7_LOCAL);
-  p7_ProfileConfig(hmm, bg, gm2, 400, p7_LOCAL);
+  p7_ProfileConfig(hmm, bg, gm, NULL,  400, p7_LOCAL, FALSE, FALSE);
+  p7_ProfileConfig(hmm, bg, gm2, NULL, 400, p7_LOCAL, FALSE, FALSE);
   p7_ReconfigLength(gm,  L);
   p7_ReconfigLength(gm2, L);
 

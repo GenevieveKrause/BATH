@@ -37,7 +37,11 @@
  *            <p7_GLOCAL>, <p7_UNILOCAL>, or <p7_UNIGLOCAL>), and an
  *            expected target sequence length <L>; configure the
  *            search model in <gm> with lod scores relative to the
- *            background frequencies in <bg>.
+ *            background frequencies in <bg>. <fs> will control 
+ *            which length model is used and <stops> will control 
+ *            the emissiosn probability of "*" aminos. If <gcode>
+ *            does not eqaul NULL, <gm->codons> will be filled
+ *            with codon->amino translations.  
  *            
  * Returns:   <eslOK> on success; the profile <gm> now contains 
  *            scores and is ready for searching target sequences.
@@ -45,7 +49,7 @@
  * Throws:    <eslEMEM> on allocation error.
  */
 int
-p7_ProfileConfig(const P7_HMM *hmm, const P7_BG *bg, P7_PROFILE *gm, int L, int mode)
+p7_ProfileConfig(const P7_HMM *hmm, const P7_BG *bg, P7_PROFILE *gm, const ESL_GENCODE *gcode, int L, int mode, int fs, int stops)
 {
   int   k, x, z;  /* counters over states, residues, annotation */
   int   status;
@@ -53,11 +57,27 @@ p7_ProfileConfig(const P7_HMM *hmm, const P7_BG *bg, P7_PROFILE *gm, int L, int 
   float *tp, *rp;
   float  sc[p7_MAXCODE];
   float  Z;
+  float  stop_codon;
+  float  non_stop;
+  int    aa;
  
   /* Contract checks */
   if (gm->abc->type != hmm->abc->type) ESL_XEXCEPTION(eslEINVAL, "HMM and profile alphabet don't match");
   if (hmm->M > gm->allocM)             ESL_XEXCEPTION(eslEINVAL, "profile too small to hold HMM");
   if (! (hmm->flags & p7H_CONS))       ESL_XEXCEPTION(eslEINVAL, "HMM must have a consensus to transfer to the profile");
+
+  gm->fs     = fs;
+  gm->stops  = stops; 
+  gm->fsprob = hmm->fsprob;
+
+  if(stops) {
+    stop_codon = log(gm->fsprob);
+	non_stop   = log(1.0 - gm->fsprob);
+  }
+  else {
+    stop_codon = -eslINFINITY;
+	non_stop   = 0.;
+  }
 
   /* Copy some pointer references and other info across from HMM  */
   gm->M                = hmm->M;
@@ -135,10 +155,10 @@ p7_ProfileConfig(const P7_HMM *hmm, const P7_BG *bg, P7_PROFILE *gm, int L, int 
     tp[p7P_DD] = log(hmm->t[k][p7H_DD]);
   }
   
-  //* Match emission scores. */
+  /* Match emission scores. */
   sc[hmm->abc->K]     = -eslINFINITY; /* gap character */
-  sc[hmm->abc->Kp-2]  = -eslINFINITY; /* nonresidue character */
   sc[hmm->abc->Kp-1]  = -eslINFINITY; /* missing data character */
+  sc[hmm->abc->Kp-2]  = stop_codon;   /* stop codon */
   for (k = 1; k <= hmm->M; k++) {
     for (x = 0; x < hmm->abc->K; x++) 
      sc[x] = log((double)hmm->mat[k][x] / bg->f[x]);
@@ -146,19 +166,10 @@ p7_ProfileConfig(const P7_HMM *hmm, const P7_BG *bg, P7_PROFILE *gm, int L, int 
      
     for (x = 0; x < hmm->abc->Kp; x++) {
       rp = gm->rsc[x] + k * p7P_NR;
-      rp[p7P_MSC] = sc[x];
+      rp[p7P_MSC] = sc[x] + non_stop;
     }
   }
 
-  /* Insert emission scores */
-  /* SRE, Fri Dec 5 08:41:08 2008: We currently hardwire insert scores
-   * to 0, i.e. corresponding to the insertion emission probabilities
-   * being equal to the background probabilities. Benchmarking shows
-   * that setting inserts to informative emission distributions causes
-   * more problems than it's worth: polar biased composition hits
-   * driven by stretches of "insertion" occur, and are difficult to
-   * correct for.
-   */
   for (x = 0; x < gm->abc->Kp; x++)
     {
       for (k = 1; k < hmm->M; k++) p7P_ISC(gm, k, x) = 0.0f;
@@ -167,25 +178,21 @@ p7_ProfileConfig(const P7_HMM *hmm, const P7_BG *bg, P7_PROFILE *gm, int L, int 
   for (k = 1; k <= hmm->M; k++) p7P_ISC(gm, k, gm->abc->K)    = -eslINFINITY; /* gap symbol */
   for (k = 1; k <= hmm->M; k++) p7P_ISC(gm, k, gm->abc->Kp-2) = -eslINFINITY; /* nonresidue symbol */
   for (k = 1; k <= hmm->M; k++) p7P_ISC(gm, k, gm->abc->Kp-1) = -eslINFINITY; /* missing data symbol */
-
-
-#if 0
-  /* original (informative) insert setting: relies on sc[K, Kp-1] initialization to -inf above */
-  for (k = 1; k < hmm->M; k++) {
-    for (x = 0; x < hmm->abc->K; x++) 
-      sc[x] = log(hmm->ins[k][x] / bg->f[x]); 
-    esl_abc_FExpectScVec(hmm->abc, sc, bg->f); 
-    for (x = 0; x < hmm->abc->Kp; x++) {
-      rp = gm->rsc[x] + k*p7P_NR;
-      rp[p7P_ISC] = sc[x];
+ 
+  /* codon to amino acid mapping */
+  if(gcode != NULL) { 
+    for(x = 0; x < p7P_MAXCODONS-1; x++) {
+      aa = gcode->basic[x];
+      gm->codons[x] = aa;
     }
-  }    
-  for (x = 0; x < hmm->abc->Kp; x++)
-    p7P_ISC(gm, hmm->M, x) = -eslINFINITY;   /* init I_M to impossible.   */
-#endif
+    gm->codons[p7P_MAXCODONS-1] = hmm->abc->Kp-3; /* all non-canonical codons = "X" */  
+  }
+  else {
+    for(x = 0; x < p7P_MAXCODONS; x++) 
+	  gm->codons[x] = 0;
+  }
 
-  /* Remaining specials, [NCJ][MOVE | LOOP] are set by ReconfigLength()
-   */
+  /* Remaining specials, [NCJ][MOVE | LOOP] are set by ReconfigLength()*/
   gm->L = 0;      /* force ReconfigLength to reconfig */
   if ((status = p7_ReconfigLength(gm, L)) != eslOK) goto ERROR;
   return eslOK;
@@ -727,7 +734,10 @@ p7_ReconfigLength(P7_PROFILE *gm, int L)
   /* Configure N,J,C transitions so they bear L/(2+nj) of the total
    * unannotated sequence length L. 
    */
-  pmove = (2.0f + gm->nj) / ((float) L + 2.0f + gm->nj); /* 2/(L+2) for uni; 3/(L+3) for multi */
+  if(gm->fs)
+    pmove = (2.0f + gm->nj) / (((float) L/3.0f) + 2.0f + gm->nj);
+  else
+    pmove = (2.0f + gm->nj) / ((float) L + 2.0f + gm->nj);
   ploop = 1.0f - pmove;
   gm->xsc[p7P_N][p7P_LOOP] =  gm->xsc[p7P_C][p7P_LOOP] = gm->xsc[p7P_J][p7P_LOOP] = log(ploop);
   gm->xsc[p7P_N][p7P_MOVE] =  gm->xsc[p7P_C][p7P_MOVE] = gm->xsc[p7P_J][p7P_MOVE] = log(pmove);
@@ -923,7 +933,7 @@ utest_Config(P7_HMM *hmm, P7_BG *bg)
   P7_PROFILE *gm  = NULL;
 
   if ((gm = p7_profile_Create(hmm->M, hmm->abc))    == NULL)   esl_fatal(msg);
-  if (p7_ProfileConfig(hmm, bg, gm, 350, p7_LOCAL)  != eslOK)  esl_fatal(msg);
+  if (p7_ProfileConfig(hmm, bg, gm, NULL, 350, p7_LOCAL, FALSE, FALSE)  != eslOK)  esl_fatal(msg);
   if (p7_profile_Validate(gm, NULL, 0.0001)         != eslOK)  esl_fatal(msg);
  
 
@@ -1170,7 +1180,7 @@ main(int argc, char **argv)
     p7_H2_ProfileConfig(hmm, bg, gm, p7_UNILOCAL);
   } else {
     gm = p7_profile_Create(hmm->M, abc);
-    p7_ProfileConfig(hmm, bg, gm, L, p7_UNILOCAL);
+    p7_ProfileConfig(hmm, bg, gm, NULL, L, p7_UNILOCAL, FALSE, FALSE);
     if (p7_hmm_Validate    (hmm, NULL, 0.0001) != eslOK) esl_fatal("whoops, HMM is bad!");
     if (p7_profile_Validate(gm,  NULL, 0.0001) != eslOK) esl_fatal("whoops, profile is bad!");
   }
