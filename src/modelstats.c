@@ -113,7 +113,7 @@ p7_MeanForwardScore(const P7_HMM *hmm, const P7_BG *bg)
   double          sum = 0.;
   int             i;
 
-  if (p7_ProfileConfig (hmm, bg, gm, L, p7_LOCAL)        != eslOK) p7_Die("failed to configure profile");
+  if (p7_ProfileConfig (hmm, bg, gm, NULL, L, p7_LOCAL, FALSE, FALSE)        != eslOK) p7_Die("failed to configure profile");
   for (i = 0; i < N; i++)
     {
       if (p7_ReconfigLength(gm, L)                        != eslOK) p7_Die("failed to reconfig profile length");
