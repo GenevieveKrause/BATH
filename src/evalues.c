@@ -703,7 +703,7 @@ p7_fs_Tau_3codons(ESL_RANDOMNESS *r, P7_FS_OPROFILE *om_fs3, P7_CODONTABLE *ct, 
  * Throws:    <eslEMEM> on allocation error, and <*ret_fv> is 0.
  */
 int
-p7_fs_Tau_5codons(ESL_RANDOMNESS *r, P7_OPROFILE om_fs, P7_FS_OPROFILE *om_fs5, P7_CODONTABLE *ct, P7_BG *bg, int L, int N, double lambda, double tailp, double *ret_tau)
+p7_fs_Tau_5codons(ESL_RANDOMNESS *r, P7_OPROFILE *om_fs, P7_FS_OPROFILE *om_fs5, P7_CODONTABLE *ct, P7_BG *bg, int L, int N, double lambda, double tailp, double *ret_tau)
 {
 
   P7_OMX  *ox      = NULL; 
@@ -739,13 +739,17 @@ p7_fs_Tau_5codons(ESL_RANDOMNESS *r, P7_OPROFILE om_fs, P7_FS_OPROFILE *om_fs5, 
       }
 
 	  if ((status = p7_ForwardParser_Frameshift_5Codons_New(dna_dsq, L*3, om_fs, ox, &fsc)) == eslERANGE) { i--; continue; }
+
       //if ((status = p7_ForwardParser_Frameshift_5Codons(dna_dsq, L*3, om_fs5, ox, &fsc)) == eslERANGE) { i--; continue; }
+      
       if (status != eslOK) goto ERROR;
        
       if ((status = p7_bg_fs_NullOne(bg, dna_dsq, L, &nullsc))          != eslOK) goto ERROR;   
       xv[i] = (fsc - nullsc) / eslCONST_LOG2;
     }
+
   if ((status = esl_gumbel_FitComplete(xv, N, &gmu, &glam)) != eslOK) goto ERROR; 
+
 
   /* Explanation of the eqn below: first find the x at which the Gumbel tail
    * mass is predicted to be equal to tailp. Then back up from that x

@@ -1265,7 +1265,7 @@ extern int p7_MSVMu     (ESL_RANDOMNESS *r, P7_OPROFILE *om, P7_BG *bg, int L, i
 extern int p7_ViterbiMu (ESL_RANDOMNESS *r, P7_OPROFILE *om, P7_BG *bg, int L, int N, double lambda,               double *ret_vmu);
 extern int p7_Tau       (ESL_RANDOMNESS *r, P7_OPROFILE *om, P7_BG *bg, int L, int N, double lambda, double tailp, double *ret_tau);
 extern int p7_fs_Tau_3codons (ESL_RANDOMNESS *r, P7_FS_OPROFILE *om_fs3, P7_CODONTABLE *ct, P7_BG *bg, int L, int N, double lambda, double tailp, double *ret_tau);
-extern int p7_fs_Tau_5codons (ESL_RANDOMNESS *r, P7_PROFILE *om_fs, P7_FS_OPROFILE *om_fs5, P7_CODONTABLE *ct, P7_BG *bg, int L, int N, double lambda, double tailp, double *ret_tau);
+extern int p7_fs_Tau_5codons (ESL_RANDOMNESS *r, P7_OPROFILE *om_fs, P7_FS_OPROFILE *om_fs5, P7_CODONTABLE *ct, P7_BG *bg, int L, int N, double lambda, double tailp, double *ret_tau);
 
 
 /* eweight.c */

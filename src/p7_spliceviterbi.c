@@ -1517,7 +1517,7 @@ utest_viterbi(ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA, ESL_ALPHABET *abcDNA,
   float           ext_down_C, ext_up_E;
 
   p7_hmm_Sample(r, M, abcAA, &hmm);
-  p7_ProfileConfig   (hmm, bgAA, gm,    M, p7_LOCAL);
+  p7_ProfileConfig   (hmm, bgAA, gm, NULL, M, p7_LOCAL, FALSE, FALSE);
   p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_tr, M, p7_UNILOCAL);
 
   pli = p7_splicepipeline_Create(NULL, M, M * 3);
