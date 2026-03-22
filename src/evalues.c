@@ -100,6 +100,13 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
     if ((bg = p7_bg_Create(hmm->abc)) == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate background");
   }
 
+  if  ( (abcDNA = esl_alphabet_Create(eslDNA))                               == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate alphabet");
+  if  ( (gcode  = esl_gencode_Create(abcDNA, hmm->abc))                      == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate gencode");
+  if  ( (status = esl_gencode_Set(gcode, hmm->ct))                           != eslOK) ESL_XFAIL(status,  errbuf, "failed to set codon table");
+  if  ( (ct     = p7_codontable_Create(gcode))                               == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate codon tbl");
+
+
+  
   /* there's an odd case where the <om> is provided and a <gm> isn't going to be returned
    * where we don't need a <gm> at all, and <gm> stays <NULL> after the next block.
    * Note that the <EvL> length in the ProfileConfig doesn't matter; the individual
@@ -127,12 +134,8 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
 
   /* Optional frameshift calribration */
   if (cfg_b != NULL && cfg_b->fs) {
-    if  ( (abcDNA = esl_alphabet_Create(eslDNA))                               == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate alphabet");
-    if  ( (gcode  = esl_gencode_Create(abcDNA, hmm->abc))                      == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate gencode");
-    if  ( (status = esl_gencode_Set(gcode, hmm->ct))                           != eslOK) ESL_XFAIL(status,  errbuf, "failed to set codon table");
-    if  ( (ct     = p7_codontable_Create(gcode))                               == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate codon tbl");
-
-    if(om_fs5 == NULL) {
+   
+      if(om_fs5 == NULL) {
       if  ( (om_fs5  = p7_fs_oprofile_Create(hmm->M, hmm->abc, p7P_5CODONS))       == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate oprofile");
       if  ( (gm_fs5  = p7_profile_fs_Create(hmm->M, hmm->abc, p7P_5CODONS))        == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate profile");
       if  ( (status  = p7_ProfileConfig_fs(hmm, bg, gcode, gm_fs5, EvL, p7_LOCAL)) != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure profile");
@@ -739,7 +742,7 @@ p7_fs_Tau_5codons(ESL_RANDOMNESS *r, P7_OPROFILE *om_fs, P7_FS_OPROFILE *om_fs5,
       }
 
 	  if ((status = p7_ForwardParser_Frameshift_5Codons_New(dna_dsq, L*3, om_fs, ox, &fsc)) == eslERANGE) { i--; continue; }
-
+      
       //if ((status = p7_ForwardParser_Frameshift_5Codons(dna_dsq, L*3, om_fs5, ox, &fsc)) == eslERANGE) { i--; continue; }
       
       if (status != eslOK) goto ERROR;

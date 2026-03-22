@@ -354,6 +354,8 @@ multifetch(ESL_GETOPTS *go, FILE *ofp, char *keyfile, P7_HMMFILE *hfp)
       gm_fs5 = NULL;
       om_fs3 = NULL;
       om_fs5 = NULL;
+      gm     = NULL;
+      om_fs  = NULL;     
 	}
   }
 
@@ -486,6 +488,8 @@ onefetch(ESL_GETOPTS *go, FILE *ofp, char *key, P7_HMMFILE *hfp)
       gm_fs5 = NULL;
       om_fs3 = NULL;
       om_fs5 = NULL;
+      gm     = NULL;
+      om_fs  = NULL;
     }
   else p7_Fail("HMM %s not found in file %s\n", key, hfp->fname);
 	
