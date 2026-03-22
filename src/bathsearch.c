@@ -803,11 +803,13 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
     om_fs5 = p7_fs_oprofile_Create(hmm->M, abcAA, p7P_5CODONS);
     gm = p7_profile_Create (hmm->M, abcAA);
     om = p7_oprofile_Create(hmm->M, abcAA);
+    om_fs = p7_oprofile_Create(hmm->M, abcAA);
+
     p7_ProfileConfig(hmm, info->bg, gm, gcode, 100, p7_LOCAL, TRUE, TRUE); /* 100 is a dummy length for now; and MSVFilter requires local mode */
       
     p7_oprofile_Convert(gm, om);                                      /* convert <om> to <gm>*/
 	om->fs = FALSE;
-
+    
 	p7_oprofile_Convert(gm, om_fs);
 
     p7_ProfileConfig_fs(hmm, info->bg, gcode, gm_fs5, 100, p7_LOCAL);  /* build framshift aware codon HMM */
