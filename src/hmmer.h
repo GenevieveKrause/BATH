@@ -611,6 +611,7 @@ typedef struct p7_hmmfile_s {
 /*****************************************************************
  * 6. P7_GMX: a "generic" dynamic programming matrix
  *****************************************************************/
+/*Different ordering than HMMER to keep M state codon types in sequential order */
 enum p7g_scells_e {
   p7G_D = 0,
   p7G_I = 1,
