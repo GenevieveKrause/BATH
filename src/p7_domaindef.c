@@ -309,8 +309,8 @@ p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *win
   int i2,j2;
   int last_j2;
   int nc;
-  int saveL     = gm_fs5->L;     /* Save the length config of <gm_fs5>; will restore upon return */
-  int save_mode = gm_fs5->mode;  /* Likewise for the mode. */
+  int saveL     = om_fs5->L;     /* Save the length config of <gm_fs5>; will restore upon return */
+  int save_mode = om_fs5->mode;  /* Likewise for the mode. */
   int status;
   P7_OMX       *oxf  = pli->oxf_fs;
   P7_OMX       *oxb  = pli->oxb_fs;
@@ -323,6 +323,7 @@ p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *win
   ddef->nexpected = ddef->btot[windowsq->n];                                                   /* posterior expectation for # of domains (same as etot[sq->n])   */
   p7_fs_ReconfigUnihit(gm_fs5, saveL/3);                                                          /* process each domain in unihit mode, regardless of om->mode     */
  p7_fs_oprofile_ReconfigUnihit(om_fs5, saveL/3);
+ p7_oprofile_ReconfigUnihit(om_fs, saveL);
 
   i         = -1;
   triggered = FALSE;
@@ -392,7 +393,6 @@ p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *win
 
       /* We have a region i..j to evaluate. */
       ddef->nregions++;
-      pli->was_region++;
       if (is_multidomain_region_frameshift(ddef, i, j))
       {
 	 	
@@ -401,7 +401,6 @@ p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *win
         * one or more domain envelopes.
         */
         ddef->nclustered++;
-        pli->was_multi++; 
        /* Resolve the region into domains by stochastic trace
         * clustering; assign position-specific null2 model by
         * stochastic trace clustering; there is redundancy
@@ -422,7 +421,6 @@ p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *win
         last_j2 = 0;
         
         for (d = 0; d < nc; d++) {
-          pli->num_clust++;
           p7_spensemble_GetClusterCoords(ddef->sp, d, &i2, &j2, NULL, NULL, NULL);
          if (i2 <= last_j2) ddef->noverlaps++;
 
@@ -467,8 +465,8 @@ p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *win
    } 
   }
   /* Restore model to uni/multihit mode, and to its original length model */
-  if (p7_IsMulti(save_mode)) p7_fs_ReconfigMultihit(gm_fs5, saveL/3); 
-  else                       p7_fs_ReconfigUnihit(gm_fs5, saveL/3); 
+  if (p7_IsMulti(save_mode)) { p7_fs_ReconfigMultihit(gm_fs5, saveL/3); p7_fs_oprofile_ReconfigMultihit(om_fs5, saveL/3); p7_oprofile_ReconfigMultihit(om_fs, saveL); }
+  else                         { p7_fs_ReconfigUnihit(gm_fs5, saveL/3); p7_fs_oprofile_ReconfigUnihit(om_fs5, saveL/3); p7_oprofile_ReconfigUnihit(om_fs, saveL); }
 
   return eslOK;
 }
