@@ -70,6 +70,7 @@ p7_oprofile_Create(int allocM, const ESL_ALPHABET *abc)
   om->twv     = NULL;
   om->rfv     = NULL;
   om->tfv     = NULL;
+  om->codons  = NULL;
   om->clone   = 0;
 
   /* level 1 */
@@ -84,6 +85,8 @@ p7_oprofile_Create(int allocM, const ESL_ALPHABET *abc)
   ESL_ALLOC(om->sbv, sizeof(__m128i *) * abc->Kp); 
   ESL_ALLOC(om->rwv, sizeof(__m128i *) * abc->Kp); 
   ESL_ALLOC(om->rfv, sizeof(__m128  *) * abc->Kp); 
+
+  ESL_ALLOC(om->codons, sizeof(ESL_DSQ) * p7P_MAXCODONS);
 
   /* align vector memory on 16-byte boundaries */
   om->rbv[0] = (__m128i *) (((unsigned long int) om->rbv_mem + 15) & (~0xf));
@@ -147,6 +150,9 @@ p7_oprofile_Create(int allocM, const ESL_ALPHABET *abc)
   om->allocM     = allocM;
   om->mode       = p7_NO_MODE;
   om->nj         = 0.0f;
+  om->fs         = 0;
+  om->stops      = 0;
+  om->fsprob     = 0.0f;
   return om;
 
  ERROR:
@@ -195,6 +201,7 @@ p7_oprofile_Destroy(P7_OPROFILE *om)
       if (om->mm        != NULL) free(om->mm);
       if (om->cs        != NULL) free(om->cs);
       if (om->consensus != NULL) free(om->consensus);
+	  if (om->codons    != NULL) free(om->codons);
     }
 
   free(om);
@@ -240,6 +247,7 @@ p7_oprofile_Sizeof(P7_OPROFILE *om)
   n  += sizeof(char) * (om->allocM+2);            /* om->cs        */
   n  += sizeof(char) * (om->allocM+2);            /* om->consensus */
 
+  n  += sizeof(ESL_DSQ) * p7P_MAXCODONS;          /* om->codons    */  
   return n;
 }
 
@@ -285,6 +293,7 @@ p7_oprofile_Copy(P7_OPROFILE *om1)
   om2->twv     = NULL;
   om2->rfv     = NULL;
   om2->tfv     = NULL;
+  om2->codons  = NULL;
 
   /* level 1 */
   ESL_ALLOC(om2->rbv_mem, sizeof(__m128i) * nqb  * abc->Kp    +15);	/* +15 is for manual 16-byte alignment */
@@ -299,6 +308,8 @@ p7_oprofile_Copy(P7_OPROFILE *om1)
   ESL_ALLOC(om2->rwv, sizeof(__m128i *) * abc->Kp); 
   ESL_ALLOC(om2->rfv, sizeof(__m128  *) * abc->Kp); 
 
+  ESL_ALLOC(om2->codons, sizeof(ESL_DSQ) * p7P_MAXCODONS);
+  
   /* align vector memory on 16-byte boundaries */
   om2->rbv[0] = (__m128i *) (((unsigned long int) om2->rbv_mem + 15) & (~0xf));
   om2->sbv[0] = (__m128i *) (((unsigned long int) om2->sbv_mem + 15) & (~0xf));
@@ -312,6 +323,8 @@ p7_oprofile_Copy(P7_OPROFILE *om1)
   memcpy(om2->sbv[0], om1->sbv[0], sizeof(__m128i) * nqs  * abc->Kp);
   memcpy(om2->rwv[0], om1->rwv[0], sizeof(__m128i) * nqw  * abc->Kp);
   memcpy(om2->rfv[0], om1->rfv[0], sizeof(__m128i) * nqf  * abc->Kp);
+
+  memcpy(om2->codons, om1->codons, sizeof(ESL_DSQ) * p7P_MAXCODONS);
 
   /* set the rest of the row pointers for match emissions */
   for (x = 1; x < abc->Kp; x++) {
@@ -378,6 +391,9 @@ p7_oprofile_Copy(P7_OPROFILE *om1)
   om2->mode      = om1->mode;
   om2->nj        = om1->nj;
   om2->max_length   = om1->max_length;
+  om2->fs        = om1->fs;
+  om2->stops     = om1->stops;
+  om2->fsprob    = om1->fsprob;
 
   om2->clone     = om1->clone;
 
@@ -1021,6 +1037,9 @@ p7_oprofile_Convert(const P7_PROFILE *gm, P7_OPROFILE *om)
   om->M          = gm->M;
   om->nj         = gm->nj;
   om->max_length = gm->max_length;
+  om->fs         = gm->fs;
+  om->stops      = gm->stops;
+  om->fsprob     = gm->fsprob;
 
   if (gm->abc->type != om->abc->type)  ESL_EXCEPTION(eslEINVAL, "alphabets of the two profiles don't match");  
   if (gm->M         >  om->allocM)     ESL_EXCEPTION(eslEINVAL, "oprofile is too small");  
@@ -1029,6 +1048,8 @@ p7_oprofile_Convert(const P7_PROFILE *gm, P7_OPROFILE *om)
   if ((status =  vf_conversion(gm, om)) != eslOK) return status;   /* ViterbiFilter()'s information */
   if ((status =  fb_conversion(gm, om)) != eslOK) return status;   /* ForwardFilter()'s information */
 
+  memcpy(om->codons, gm->codons, sizeof(ESL_DSQ) * p7P_MAXCODONS);
+   
   if (om->name != NULL) free(om->name);
   if (om->acc  != NULL) free(om->acc);
   if (om->desc != NULL) free(om->desc);
@@ -1161,8 +1182,10 @@ int
 p7_oprofile_ReconfigRestLength(P7_OPROFILE *om, int L)
 {
   float pmove, ploop;
-  
-  pmove = (2.0f + om->nj) / ((float) L + 2.0f + om->nj); /* 2/(L+2) for sw; 3/(L+3) for fs */
+  if(om->fs) 
+    pmove = (2.0f + om->nj) / ((float) L / 3.0f + 2.0f + om->nj); /* 2/(L+2) for sw; 3/(L+3) for fs */
+  else
+    pmove = (2.0f + om->nj) / ((float) L + 2.0f + om->nj); /* 2/(L+2) for sw; 3/(L+3) for fs */
   ploop = 1.0f - pmove;
 
   /* ForwardFilter() parameters: pspace floats */
@@ -1918,6 +1941,11 @@ p7_oprofile_Compare(const P7_OPROFILE *om1, const P7_OPROFILE *om2, float tol, c
    if (esl_vec_FCompare(om1->evparam, om2->evparam, p7_NEVPARAM, tol) != eslOK) ESL_FAIL(eslFAIL, errmsg, "comparison failed: evparam vector");
    if (esl_vec_FCompare(om1->cutoff,  om2->cutoff,  p7_NCUTOFFS, tol) != eslOK) ESL_FAIL(eslFAIL, errmsg, "comparison failed: cutoff vector");
    if (esl_vec_FCompare(om1->compo,   om2->compo,   p7_MAXABET,  tol) != eslOK) ESL_FAIL(eslFAIL, errmsg, "comparison failed: compo vector");
+
+   if (om1->fs     != om2->fs)     ESL_FAIL(eslFAIL, errmsg, "comparison failed: fs");
+   if (om1->stops  != om2->stops)  ESL_FAIL(eslFAIL, errmsg, "comparison failed: stops");
+   if (om1->fsprob != om2->fsprob) ESL_FAIL(eslFAIL, errmsg, "comparison failed: fsprob");
+   if (memcmp(om1->codons, om2->codons, sizeof(ESL_DSQ) * p7P_MAXCODONS) != 0) ESL_FAIL(eslFAIL, errmsg, "comparison failed: codons");
 
    return eslOK;
 }

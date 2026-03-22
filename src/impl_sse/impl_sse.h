@@ -112,6 +112,12 @@ typedef struct p7_oprofile_s {
   off_t  roff;                  /* record offset (start of record); -1 if none       */
   off_t  eoff;                  /* offset to last byte of record; -1 if unknown      */
 
+  /* Frameshift/Translated specific parameters                                         */
+  ESL_DSQ*  codons;        /* Codon -> Amino Acid translations [p7P_MAXCODONS][0.1..M] */ 
+  float     fsprob;        /* frameshift penalty (log-odds score)                      */
+  int       fs;            /* bool for frameshift-aware length model                  */
+  int       stops;         /* bool to disallow stop codons for translated functions   */ 
+
   /* Information, annotation copied from parent profile:                             */
   char  *name;      /* unique name of model                              */
   char  *acc;      /* unique accession of model, or NULL                */
