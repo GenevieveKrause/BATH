@@ -86,6 +86,7 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
   double          lambda, mmu, vmu, tau, tau_fs3, tau_fs5;
   int             status;
 
+  P7_OPROFILE *om_fs = NULL;
   /* Configure any objects we need
    * that weren't already passed to us as a bypass optimization 
    */
@@ -106,14 +107,18 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
    */
   if ((esl_byp_IsInternal(byp_gm) && ! esl_byp_IsProvided(byp_om)) || esl_byp_IsReturned(byp_gm)) {
     if  ( (gm     = p7_profile_Create(hmm->M, hmm->abc))          == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate profile");
-    if  ( (status = p7_ProfileConfig(hmm, bg, gm, NULL, EvL, p7_LOCAL, FALSE, FALSE)) != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure profile");
+    if  ( (status = p7_ProfileConfig(hmm, bg, gm, gcode, EvL, p7_LOCAL, TRUE, TRUE)) != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure profile");
   }
 
   if (om == NULL) {
     if ((om     = p7_oprofile_Create(hmm->M, hmm->abc)) == NULL) ESL_XFAIL(eslEMEM, errbuf, "failed to create optimized profile");
     if ((status = p7_oprofile_Convert(gm, om))         != eslOK) ESL_XFAIL(status,  errbuf, "failed to convert to optimized profile");
+	om->fs = FALSE;
   }
- 
+
+  om_fs = p7_oprofile_Create(hmm->M, hmm->abc);
+  p7_oprofile_Convert(gm, om_fs);
+
   /* The calibration steps themselves */
   if ((status = p7_Lambda(hmm, bg, &lambda))                             != eslOK) ESL_XFAIL(status,  errbuf, "failed to determine lambda");
   if ((status = p7_MSVMu    (r, om, bg, EmL, EmN, lambda, &mmu))         != eslOK) ESL_XFAIL(status,  errbuf, "failed to determine msv mu");
@@ -140,7 +145,7 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
       if  ( (status  = p7_fs_oprofile_Convert(gm_fs3, om_fs3))                     != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure oprofile");
     }
     if ((status = p7_fs_Tau_3codons (r, om_fs3, ct, bg, EfL, EfN, lambda, Eft, &tau_fs3)) != eslOK) ESL_XFAIL(status, errbuf, "failed to determine fwd frameshifted tau");
-    if ((status = p7_fs_Tau_5codons (r, om_fs5, ct, bg, EfL, EfN, lambda, Eft, &tau_fs5)) != eslOK) ESL_XFAIL(status, errbuf, "failed to determine fwd frameshifted tau");
+    if ((status = p7_fs_Tau_5codons (r, om_fs, om_fs5, ct, bg, EfL, EfN, lambda, Eft, &tau_fs5)) != eslOK) ESL_XFAIL(status, errbuf, "failed to determine fwd frameshifted tau");
   }
  
 
@@ -178,6 +183,7 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
   esl_alphabet_Destroy(abcDNA);
   esl_gencode_Destroy(gcode);
   p7_codontable_Destroy(ct);
+  p7_oprofile_Destroy(om_fs);
   
   return eslOK;
 
@@ -697,7 +703,7 @@ p7_fs_Tau_3codons(ESL_RANDOMNESS *r, P7_FS_OPROFILE *om_fs3, P7_CODONTABLE *ct, 
  * Throws:    <eslEMEM> on allocation error, and <*ret_fv> is 0.
  */
 int
-p7_fs_Tau_5codons(ESL_RANDOMNESS *r, P7_FS_OPROFILE *om_fs5, P7_CODONTABLE *ct, P7_BG *bg, int L, int N, double lambda, double tailp, double *ret_tau)
+p7_fs_Tau_5codons(ESL_RANDOMNESS *r, P7_OPROFILE om_fs, P7_FS_OPROFILE *om_fs5, P7_CODONTABLE *ct, P7_BG *bg, int L, int N, double lambda, double tailp, double *ret_tau)
 {
 
   P7_OMX  *ox      = NULL; 
@@ -717,6 +723,7 @@ p7_fs_Tau_5codons(ESL_RANDOMNESS *r, P7_FS_OPROFILE *om_fs5, P7_CODONTABLE *ct, 
   if (ox == NULL) { status = eslEMEM; goto ERROR; }
 
   p7_fs_oprofile_ReconfigLength(om_fs5, L);
+  p7_oprofile_ReconfigLength(om_fs, L*3);
   p7_bg_SetLength(bg, L);
 
   for (i = 0; i < N; i++)
@@ -731,7 +738,8 @@ p7_fs_Tau_5codons(ESL_RANDOMNESS *r, P7_FS_OPROFILE *om_fs5, P7_CODONTABLE *ct, 
         j+=3;
       }
 
-      if ((status = p7_ForwardParser_Frameshift_5Codons(dna_dsq, L*3, om_fs5, ox, &fsc)) == eslERANGE) { i--; continue; }
+	  if ((status = p7_ForwardParser_Frameshift_5Codons_New(dna_dsq, L*3, om_fs, ox, &fsc)) == eslERANGE) { i--; continue; }
+      //if ((status = p7_ForwardParser_Frameshift_5Codons(dna_dsq, L*3, om_fs5, ox, &fsc)) == eslERANGE) { i--; continue; }
       if (status != eslOK) goto ERROR;
        
       if ((status = p7_bg_fs_NullOne(bg, dna_dsq, L, &nullsc))          != eslOK) goto ERROR;   
@@ -827,6 +835,7 @@ main(int argc, char **argv)
   P7_BG          *bg      = NULL;
   P7_PROFILE     *gm      = NULL;
   P7_OPROFILE    *om      = NULL;
+  P7_OPROFILE    *om_fs   = NULL;
   P7_FS_PROfILE  *gm_fs5  = NULL;
   P7_FS_PROfILE  *gm_fs3  = NULL;
   P7_FS_OPROfILE *om_fs5  = NULL;
@@ -870,9 +879,12 @@ main(int argc, char **argv)
 
       if (bg == NULL) bg = p7_bg_Create(abc);
       gm = p7_profile_Create(hmm->M, abc);
-      p7_ProfileConfig(hmm, bg, gm, NULL, EvL, p7_LOCAL, FALSE, FALSE); /* the EvL doesn't matter */
+      p7_ProfileConfig(hmm, bg, gm, gcode, EvL, p7_LOCAL, TRUE, TRUE); /* the EvL doesn't matter */
       om = p7_oprofile_Create(hmm->M, abc);
       p7_oprofile_Convert(gm, om);
+      om->fs = FALSE;
+	  om_fs = p7_oprofile_Create(hmm->M, abc);
+	  p7_oprofile_Convert(gm, om_fs);
 
       if(abc->type == eslAMINO) {
         if(abcDNA == NULL) abcDNA = esl_alphabet_Create(eslDNA);
@@ -900,7 +912,7 @@ main(int argc, char **argv)
 	  if (do_fwd)  p7_Tau       (r, om, bg, EfL, EfN, lambda, Eft,  &ftau);
       if(abc->type == eslAMINO) {
         if (do_fwd3) p7_fs_Tau_3codons(r, om_fs3, ct, bg, EfL, EfN, lambda, Eft, &ftau3) 
-        if (do_fwd5) p7_fs_Tau_5codons(r, om_fs5, ct, bg, EfL, EfN, lambda, Eft, &ftau5)
+        if (do_fwd5) p7_fs_Tau_5codons(r, om_fs, om_fs5, ct, bg, EfL, EfN, lambda, Eft, &ftau5)
       }
 	  printf("%s %.4f %.4f %.4f %.4f", hmm->name, lambda, mmu, vmu, ftau);
       if (abc->type == eslAMINO)  printf(" %.4f %.4f\n", ftau3, ftau5);
@@ -910,6 +922,7 @@ main(int argc, char **argv)
       p7_hmm_Destroy(hmm);      
       p7_profile_Destroy(gm);
       p7_oprofile_Destroy(om);
+	  p7_oprofile_Destroy(om_fs);
       p7_fs_oprofile_Destroy(om_fs5);
       p7_fs_oprofile_Destroy(om_fs3);
       p7_profile_fs_Destroy(gm_fs5);

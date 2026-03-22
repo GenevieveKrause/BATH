@@ -244,6 +244,8 @@ multifetch(ESL_GETOPTS *go, FILE *ofp, char *keyfile, P7_HMMFILE *hfp)
   P7_HMM         *hmm       = NULL;
   P7_BG          *bg        = NULL;
   ESL_RANDOMNESS *r         = NULL;
+  P7_PROFILE     *gm        = NULL;
+  P7_OPROFILE    *om_fs     = NULL;
   P7_FS_PROFILE  *gm_fs5    = NULL;
   P7_FS_PROFILE  *gm_fs3    = NULL;
   P7_FS_OPROFILE *om_fs5    = NULL;
@@ -318,10 +320,15 @@ multifetch(ESL_GETOPTS *go, FILE *ofp, char *keyfile, P7_HMMFILE *hfp)
           p7_ProfileConfig_fs(hmm, bg, gcode, gm_fs5, 100, p7_LOCAL);
           p7_fs_oprofile_Convert(gm_fs5, om_fs5);
 
+		  om_fs = p7_oprofile_Create(hmm->M, hmm->abc);
+          gm = p7_profile_Create(hmm->M, hmm->abc);
+          p7_ProfileConfig(hmm, bg, gm, gcode, 100, p7_LOCAL, TRUE, TRUE);
+          p7_oprofile_Convert(gm, om_fs);
+
           p7_fs_Tau_3codons(r, om_fs3, codon_tbl, bg, 100, 200, hmm->evparam[p7_FLAMBDA], 0.04, &tau_fs);
           hmm->evparam[p7_FTAUFS3] = tau_fs;
 
-          p7_fs_Tau_5codons(r, om_fs5, codon_tbl, bg, 100, 200, hmm->evparam[p7_FLAMBDA], 0.04, &tau_fs);
+          p7_fs_Tau_5codons(r, om_fs, om_fs5, codon_tbl, bg, 100, 200, hmm->evparam[p7_FLAMBDA], 0.04, &tau_fs);
           hmm->evparam[p7_FTAUFS5] = tau_fs;
         }
       }
@@ -340,6 +347,8 @@ multifetch(ESL_GETOPTS *go, FILE *ofp, char *keyfile, P7_HMMFILE *hfp)
       p7_fs_oprofile_Destroy(om_fs3);
       p7_profile_fs_Destroy(gm_fs5);
       p7_fs_oprofile_Destroy(om_fs5);
+	  p7_profile_Destroy(gm);
+      p7_oprofile_Destroy(om_fs);
 
       gm_fs3 = NULL;
       gm_fs5 = NULL;
@@ -353,6 +362,8 @@ multifetch(ESL_GETOPTS *go, FILE *ofp, char *keyfile, P7_HMMFILE *hfp)
   if(gm_fs3 != NULL) p7_profile_fs_Destroy(gm_fs3);
   if(om_fs5 != NULL) p7_fs_oprofile_Destroy(om_fs5);
   if(om_fs3 != NULL) p7_fs_oprofile_Destroy(om_fs3);
+    if(gm != NULL)       p7_profile_Destroy(gm);
+  if(om_fs != NULL)       p7_oprofile_Destroy(om_fs);
   if(r != NULL)     esl_randomness_Destroy(r); 
   if (ofp != stdout) printf("\nRetrieved %d HMMs.\n", nhmm);
   if (abc != NULL) esl_alphabet_Destroy(abc);
@@ -383,6 +394,8 @@ onefetch(ESL_GETOPTS *go, FILE *ofp, char *key, P7_HMMFILE *hfp)
   P7_FS_PROFILE  *gm_fs3    = NULL;
   P7_FS_OPROFILE *om_fs5    = NULL;
   P7_FS_OPROFILE *om_fs3    = NULL;
+  P7_PROFILE     *gm        = NULL;
+  P7_OPROFILE    *om_fs     = NULL;
   ESL_GENCODE    *gcode     = NULL;
   ESL_ALPHABET   *abcDNA    = NULL;
   P7_CODONTABLE  *codon_tbl = NULL;
@@ -445,10 +458,15 @@ onefetch(ESL_GETOPTS *go, FILE *ofp, char *key, P7_HMMFILE *hfp)
           p7_ProfileConfig_fs(hmm, bg, gcode, gm_fs5, 100, p7_LOCAL);
           p7_fs_oprofile_Convert(gm_fs5, om_fs5);
 
+		  om_fs = p7_oprofile_Create(hmm->M, hmm->abc);
+          gm = p7_profile_Create(hmm->M, hmm->abc);
+          p7_ProfileConfig(hmm, bg, gm, gcode, 100, p7_LOCAL, TRUE, TRUE);
+          p7_oprofile_Convert(gm, om_fs);
+
           p7_fs_Tau_3codons(r, om_fs3, codon_tbl, bg, 100, 200, hmm->evparam[p7_FLAMBDA], 0.04, &tau_fs);
           hmm->evparam[p7_FTAUFS3] = tau_fs;
 
-          p7_fs_Tau_5codons(r, om_fs5, codon_tbl, bg, 100, 200, hmm->evparam[p7_FLAMBDA], 0.04, &tau_fs);
+          p7_fs_Tau_5codons(r, om_fs, om_fs5, codon_tbl, bg, 100, 200, hmm->evparam[p7_FLAMBDA], 0.04, &tau_fs);
           hmm->evparam[p7_FTAUFS5] = tau_fs;
         }
       }
@@ -461,6 +479,8 @@ onefetch(ESL_GETOPTS *go, FILE *ofp, char *key, P7_HMMFILE *hfp)
       p7_fs_oprofile_Destroy(om_fs3);
       p7_profile_fs_Destroy(gm_fs5);
       p7_fs_oprofile_Destroy(om_fs5);
+	  p7_profile_Destroy(gm);
+      p7_oprofile_Destroy(om_fs);
 
       gm_fs3 = NULL;
       gm_fs5 = NULL;
@@ -474,6 +494,8 @@ onefetch(ESL_GETOPTS *go, FILE *ofp, char *key, P7_HMMFILE *hfp)
   if(gm_fs3 != NULL) p7_profile_fs_Destroy(gm_fs3);
   if(om_fs5 != NULL) p7_fs_oprofile_Destroy(om_fs5);
   if(om_fs3 != NULL) p7_fs_oprofile_Destroy(om_fs3);
+  if(gm != NULL)       p7_profile_Destroy(gm);
+  if(om_fs != NULL)       p7_oprofile_Destroy(om_fs);
   if(r != NULL)     esl_randomness_Destroy(r);
   if(abc) esl_alphabet_Destroy(abc);
   if(abcDNA) esl_alphabet_Destroy(abcDNA);
