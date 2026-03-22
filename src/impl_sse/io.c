@@ -170,6 +170,13 @@ p7_oprofile_Write(FILE *ffp, FILE *pfp, P7_OPROFILE *om)
   if (fwrite((char *) &(om->nj),        sizeof(float),    1,           pfp) != 1)           ESL_EXCEPTION_SYS(eslEWRITE, "oprofile write failed");
   if (fwrite((char *) &(om->mode),      sizeof(int),      1,           pfp) != 1)           ESL_EXCEPTION_SYS(eslEWRITE, "oprofile write failed");
   if (fwrite((char *) &(om->L)   ,      sizeof(int),      1,           pfp) != 1)           ESL_EXCEPTION_SYS(eslEWRITE, "oprofile write failed");
+
+  /* Frameshift/translated-search fields */
+  if (fwrite((char *) &(om->fs),        sizeof(int),      1,              pfp) != 1)              ESL_EXCEPTION_SYS(eslEWRITE, "oprofile write failed");
+  if (fwrite((char *) &(om->stops),     sizeof(int),      1,              pfp) != 1)              ESL_EXCEPTION_SYS(eslEWRITE, "oprofile write failed");
+  if (fwrite((char *) &(om->fsprob),    sizeof(float),    1,              pfp) != 1)              ESL_EXCEPTION_SYS(eslEWRITE, "oprofile write failed");
+  if (fwrite((char *)  om->codons,      sizeof(ESL_DSQ),  p7P_MAXCODONS,  pfp) != p7P_MAXCODONS)  ESL_EXCEPTION_SYS(eslEWRITE, "oprofile write failed");
+
   if (fwrite((char *) &(v3f_pmagic),    sizeof(uint32_t), 1,           pfp) != 1)           ESL_EXCEPTION_SYS(eslEWRITE, "oprofile write failed"); /* sentinel */
   return eslOK;
 }
@@ -570,6 +577,12 @@ p7_oprofile_ReadRest(P7_HMMFILE *hfp, P7_OPROFILE *om)
   if (! fread((char *) &(om->nj),        sizeof(float),    1,           hfp->pfp)) ESL_XFAIL(eslEFORMAT, hfp->errbuf, "failed to read nj");
   if (! fread((char *) &(om->mode),      sizeof(int),      1,           hfp->pfp)) ESL_XFAIL(eslEFORMAT, hfp->errbuf, "failed to read mode");
   if (! fread((char *) &(om->L)   ,      sizeof(int),      1,           hfp->pfp)) ESL_XFAIL(eslEFORMAT, hfp->errbuf, "failed to read L");
+
+  /* Frameshift/translated-search fields */
+  if (! fread((char *) &(om->fs),        sizeof(int),      1,              hfp->pfp)) ESL_XFAIL(eslEFORMAT, hfp->errbuf, "failed to read fs");
+  if (! fread((char *) &(om->stops),     sizeof(int),      1,              hfp->pfp)) ESL_XFAIL(eslEFORMAT, hfp->errbuf, "failed to read stops");
+  if (! fread((char *) &(om->fsprob),    sizeof(float),    1,              hfp->pfp)) ESL_XFAIL(eslEFORMAT, hfp->errbuf, "failed to read fsprob");
+  if (! fread((char *)  om->codons,      sizeof(ESL_DSQ),  p7P_MAXCODONS,  hfp->pfp)) ESL_XFAIL(eslEFORMAT, hfp->errbuf, "failed to read codons");
 
   /* record ends with magic sentinel, for detecting binary file corruption */
   if (! fread( (char *) &magic,     sizeof(uint32_t), 1, hfp->pfp))  ESL_XFAIL(eslEFORMAT, hfp->errbuf, "no sentinel magic: .h3p file corrupted?");
