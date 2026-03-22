@@ -249,11 +249,6 @@ p7_pipeline_Create_BATH(ESL_GETOPTS *go, int M_hint, int L_hint, enum p7_pipemod
    pli->hfp             = NULL;
    pli->errbuf[0]       = '\0';
 
-
-//TODO
-  pli->was_region = 0;
-  pli->was_multi = 0;
-  pli->num_clust = 0;
    return pli;
 
 ERROR:
@@ -735,7 +730,7 @@ p7_pli_computeAliScores_BATH(P7_DOMAIN *dom, P7_TRACE *tr, const ESL_SQ *seq, co
     i = tr->i[z1];
     c = tr->c[z1];
     k = tr->k[z1]; 
-
+    
     if (tr->st[z1] == p7T_M) {
       if(c == 1) {
         if(nuc_dsq[i] < p7P_MAXNUC)
