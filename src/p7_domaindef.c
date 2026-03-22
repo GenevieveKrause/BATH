@@ -22,7 +22,7 @@ static int is_multidomain_region  (P7_DOMAINDEF *ddef, int i, int j);
 static int is_multidomain_region_frameshift  (P7_DOMAINDEF *ddef, int i, int j);
 static int region_trace_ensemble  (P7_DOMAINDEF *ddef, const P7_OPROFILE *om, const ESL_DSQ *dsq, int ireg, int jreg, const P7_OMX *fwd, P7_OMX *wrk, int *ret_nc);
 static int region_trace_ensemble_frameshift  (P7_DOMAINDEF *ddef, const P7_FS_OPROFILE *om_fs, const ESL_DSQ *dsq, const ESL_ALPHABET *abc, int ireg, int jreg, const P7_OMX *fwd, int *ret_nc);
-static int rescore_isolated_domain_frameshift(P7_DOMAINDEF *ddef, P7_PIPELINE *pli, P7_FS_OPROFILE *om_fs5, P7_FS_PROFILE *gm_fs5, ESL_SQ *windowsq, int i, int j, P7_BG *bg,  const ESL_GENCODE *gcode);
+static int rescore_isolated_domain_frameshift(P7_DOMAINDEF *ddef, P7_PIPELINE *pli, P7_OPROFILE *om_fs, P7_FS_OPROFILE *om_fs5, P7_FS_PROFILE *gm_fs5, ESL_SQ *windowsq, int i, int j, P7_BG *bg,  const ESL_GENCODE *gcode);
 static int rescore_isolated_domain_bath(P7_DOMAINDEF *ddef, P7_OPROFILE *om, P7_FS_PROFILE *gm_fs5, const ESL_SQ *orfsq, const ESL_SQ *windowsq, const int64_t ntsqlen, P7_OMX *ox1, P7_OMX *ox2, int i, int j, int null2_is_done);
 
 /*****************************************************************
@@ -298,7 +298,7 @@ p7_domaindef_Destroy_BATH(P7_DOMAINDEF *ddef)
  * Throws:    <eslEMEM> on allocation failure. 
  */
 int
-p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *windowsq, P7_FS_OPROFILE *om_fs5, P7_FS_PROFILE *gm_fs5, P7_BG *bg, const ESL_GENCODE *gcode)
+p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *windowsq, P7_OPROFILE *om_fs, P7_FS_OPROFILE *om_fs5, P7_FS_PROFILE *gm_fs5, P7_BG *bg, const ESL_GENCODE *gcode)
 {
 
   int i, j;
@@ -448,7 +448,7 @@ p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *win
          i2 = ESL_MAX(1,i2); // Hacky bug fix to prevent 0 index - real fix requires changes to region_trace_ensemble_frameshift() 
 
           ddef->nenvelopes++;
-         if (rescore_isolated_domain_frameshift(ddef, pli, om_fs5, gm_fs5, windowsq, i2, j2, bg, gcode) == eslOK) last_j2 = j2;
+         if (rescore_isolated_domain_frameshift(ddef, pli, om_fs, om_fs5, gm_fs5, windowsq, i2, j2, bg, gcode) == eslOK) last_j2 = j2;
         }
 
         p7_spensemble_Reuse(ddef->sp);
@@ -457,7 +457,7 @@ p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *win
      } else {
 	
       ddef->nenvelopes++;
-      rescore_isolated_domain_frameshift(ddef, pli, om_fs5, gm_fs5, windowsq, i, j, bg, gcode);
+      rescore_isolated_domain_frameshift(ddef, pli, om_fs, om_fs5, gm_fs5, windowsq, i, j, bg, gcode);
     }
     i     = -1;
     triggered = FALSE;
@@ -991,7 +991,7 @@ region_trace_ensemble_frameshift(P7_DOMAINDEF *ddef, const P7_FS_OPROFILE *om_fs
  * 
  */
 static int
-rescore_isolated_domain_frameshift(P7_DOMAINDEF *ddef, P7_PIPELINE *pli, P7_FS_OPROFILE *om_fs5, P7_FS_PROFILE *gm_fs5, ESL_SQ *windowsq, int i, int j, P7_BG *bg, const ESL_GENCODE *gcode)
+rescore_isolated_domain_frameshift(P7_DOMAINDEF *ddef, P7_PIPELINE *pli, P7_OPROFILE *om_fs, P7_FS_OPROFILE *om_fs5, P7_FS_PROFILE *gm_fs5, ESL_SQ *windowsq, int i, int j, P7_BG *bg, const ESL_GENCODE *gcode)
 {
 
   P7_DOMAIN *dom           = NULL;

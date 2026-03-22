@@ -1269,7 +1269,7 @@ ERROR:
  *
  */
 static int
-p7_pli_postViterbi_Frameshift_BATH(P7_PIPELINE *pli, P7_OPROFILE *om, P7_FS_OPROFILE *om_fs3, P7_FS_OPROFILE *om_fs5, P7_FS_PROFILE *gm_fs5, P7_BG *bg, P7_TOPHITS *hitlist, int64_t seqidx, P7_HMM_WINDOW *dna_window, int windowidx, ESL_SQ_BLOCK *orf_block, ESL_SQ *dnasq, ESL_GENCODE *gcode, P7_PIPELINE_BATH_OBJS *pli_tmp, int complementarity)
+p7_pli_postViterbi_Frameshift_BATH(P7_PIPELINE *pli, P7_OPROFILE *om, P7_OPROFILE *om_fs, P7_FS_OPROFILE *om_fs3, P7_FS_OPROFILE *om_fs5, P7_FS_PROFILE *gm_fs5, P7_BG *bg, P7_TOPHITS *hitlist, int64_t seqidx, P7_HMM_WINDOW *dna_window, int windowidx, ESL_SQ_BLOCK *orf_block, ESL_SQ *dnasq, ESL_GENCODE *gcode, P7_PIPELINE_BATH_OBJS *pli_tmp, int complementarity)
 {
 
   int              f;
@@ -1374,7 +1374,7 @@ p7_pli_postViterbi_Frameshift_BATH(P7_PIPELINE *pli, P7_OPROFILE *om, P7_FS_OPRO
     if (status == eslERANGE) return eslOK; /* backward underflow; skip domain definition for this window */
     if (status != eslOK) ESL_FAIL(status, pli->errbuf, "frameshift backward filter failed");
 
-    status = p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(pli, pli_tmp->tmpseq, om_fs5, gm_fs5, bg, gcode);
+    status = p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(pli, pli_tmp->tmpseq, om_fs, om_fs5, gm_fs5, bg, gcode);
 
     if (status != eslOK) ESL_FAIL(status, pli->errbuf, "domain definition workflow failure"); 
 	/* score passed threshold but there's no discrete domains or region was found, stochastic clustered, no envelope found */
@@ -1635,7 +1635,7 @@ ERROR:
  * Xref:      J4/25.
  */
 int
-p7_Pipeline_BATH(P7_PIPELINE *pli, P7_OPROFILE *om, P7_FS_OPROFILE *om_fs3, P7_FS_OPROFILE *om_fs5, P7_FS_PROFILE *gm_fs5, P7_SCOREDATA *data, P7_BG *bg, P7_TOPHITS *hitlist, int64_t seqidx, ESL_SQ *dnasq, ESL_SQ_BLOCK *orf_block, ESL_GENCODE *gcode,P7_HMM_WINDOWLIST *splcing_windows, int complementarity)
+p7_Pipeline_BATH(P7_PIPELINE *pli, P7_OPROFILE *om, P7_OPROFILE *om_fs, P7_FS_OPROFILE *om_fs3, P7_FS_OPROFILE *om_fs5, P7_FS_PROFILE *gm_fs5, P7_SCOREDATA *data, P7_BG *bg, P7_TOPHITS *hitlist, int64_t seqidx, ESL_SQ *dnasq, ESL_SQ_BLOCK *orf_block, ESL_GENCODE *gcode,P7_HMM_WINDOWLIST *splcing_windows, int complementarity)
 {
 
   int                i;
@@ -1782,7 +1782,7 @@ p7_Pipeline_BATH(P7_PIPELINE *pli, P7_OPROFILE *om, P7_FS_OPROFILE *om_fs3, P7_F
 
     for(i = 0; i < post_vit_windowlist.count; i++)
     {
-      p7_pli_postViterbi_Frameshift_BATH(pli, om, om_fs3, om_fs5, gm_fs5, bg, hitlist, seqidx, &(post_vit_windowlist.windows[i]), i, post_vit_orf_block, dnasq, gcode, pli_tmp, complementarity);
+      p7_pli_postViterbi_Frameshift_BATH(pli, om, om_fs, om_fs3, om_fs5, gm_fs5, bg, hitlist, seqidx, &(post_vit_windowlist.windows[i]), i, post_vit_orf_block, dnasq, gcode, pli_tmp, complementarity);
     }
   }
 
