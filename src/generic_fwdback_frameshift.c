@@ -2966,7 +2966,7 @@ utest_forward_fs(ESL_GETOPTS *go, ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA, P7_COD
   P7_IVX      *iv     = NULL;
   int         idx;
   float       vsc, fsc, bsc;
-  float       new_fsc;
+  float       new_fsc, new_bsc;
   float       fsc_p, bsc_p;
   float       nullsc;
 
@@ -2994,6 +2994,7 @@ utest_forward_fs(ESL_GETOPTS *go, ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA, P7_COD
         p7_codontable_GetCodon(codon_table, r, dsqAA[i], dsqDNA+j);
         j+=3;
 	  }
+       
       if (p7_GViterbi_Frameshift(dsqDNA, L, gm_fs5, vit, iv, &vsc)      != eslOK) esl_fatal("viterbi failed");
       if (p7_GForward_Frameshift(dsqDNA, L, gm_fs5, fwd, iv, &fsc)      != eslOK) esl_fatal("forward failed");
       if (p7_GBackward_Frameshift(dsqDNA, L, gm_fs5, bck, iv, &bsc)     != eslOK) esl_fatal("backward failed");
@@ -3024,7 +3025,7 @@ utest_forward_fs(ESL_GETOPTS *go, ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA, P7_COD
 
       if (fabs(fsc_p-bsc_p) > 0.001) esl_fatal("Forward Parser 3 /Backward Parser 3 failed: %f %f\n", fsc_p, bsc_p);
 	  if (p7_GForward_Frameshift_New(dsqDNA, (sq->n*3), gm, fwd, iv, &new_fsc)  != eslOK) esl_fatal("New forward failed");
-	  if (p7_GBackward_Frameshift_New(dsqDNA, (sq->n*3), gm, bwd, iv, &new_bsc)  != eslOK) esl_fatal("New backward failed");
+	  if (p7_GBackward_Frameshift_New(dsqDNA, (sq->n*3), gm, bck, iv, &new_bsc)  != eslOK) esl_fatal("New backward failed");
 
 	  if (fabs(new_fsc-new_bsc) > 0.001) esl_fatal("New Forward/Backward failed: %f %f\n", new_fsc, new_bsc);
       if (esl_opt_GetBoolean(go, "--vv")) 
