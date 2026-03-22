@@ -271,13 +271,13 @@ serial_loop(WORKER_INFO *info, struct cfg_s *cfg, const ESL_GETOPTS *go)
 
         /*         bg   new-HMM trarr gm   om  */
         if ( msa->nseq == 1 && esl_opt_IsUsed(go, "--singlemx")) {
-          if ((status = esl_sq_FetchFromMSA(msa, 0, &sq)) != eslOK) p7_Fail("build failed: %s", bld->errbuf);
-          if ((status = p7_SingleBuilder(info->bld, sq, info->bg, &hmm, NULL, NULL, NULL)) != eslOK) p7_Fail("build failed: %s", bld->errbuf);
+          if ((status = esl_sq_FetchFromMSA(msa, 0, &sq)) != eslOK) p7_Fail("build failed: %s", info->bld->errbuf);
+          if ((status = p7_SingleBuilder(info->bld, sq, info->bg, &hmm, NULL, NULL, NULL)) != eslOK) p7_Fail("build failed: %s", info->bld->errbuf);
           esl_sq_Destroy(sq);
           sq = NULL;
           hmm->eff_nseq = 1;
         } else {
-          if ((status = p7_Builder(info->bld, msa, info->bg, &hmm, NULL, NULL, NULL, NULL, NULL, NULL )) != eslOK) p7_Fail("build failed: %s", bld->errbuf);
+          if ((status = p7_Builder(info->bld, msa, info->bg, &hmm, NULL, NULL, NULL, NULL, NULL, NULL )) != eslOK) p7_Fail("build failed: %s", info->bld->errbuf);
 
           //if not --singlemx, but the user set the popen/pextend flags, override the computed gap params now:
           if (info->bld->popen != -1 || info->bld->pextend != -1) {
@@ -296,7 +296,7 @@ serial_loop(WORKER_INFO *info, struct cfg_s *cfg, const ESL_GETOPTS *go)
       {  
          cfg->nali++;
          if (status != eslOK) p7_Fail("reading unaligned sequences from input file %s (%d)\n", cfg->infile, status); 
-         if ((status = p7_SingleBuilder(info->bld, sq, info->bg, &hmm, NULL, NULL, NULL)) != eslOK) p7_Fail("build failed: %s", bld->errbuf);
+         if ((status = p7_SingleBuilder(info->bld, sq, info->bg, &hmm, NULL, NULL, NULL)) != eslOK) p7_Fail("build failed: %s", info->bld->errbuf);
      
          hmm->eff_nseq = 1;
          if ((status = p7_hmmfile_WriteASCII(cfg->hmmfp, p7_BATH_3f, hmm)) != eslOK) p7_Fail("HMM save failed"); 
