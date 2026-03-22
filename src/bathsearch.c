@@ -41,6 +41,7 @@ typedef struct {
   P7_PIPELINE      *pli;        /* work pipeline                                                     */
   P7_TOPHITS       *th;         /* top hit results                                                   */
   P7_OPROFILE      *om;         /* optimized query profile                                           */
+  P7_OPROFILE      *om_fs;      /* optimized query profile                                           */
   P7_FS_PROFILE    *gm_fs5;     /* non optimized 5 codon length frameshift query profile             */
   P7_FS_OPROFILE   *om_fs5;     /* optimized 5 codon length frameshift query profile             */
   P7_FS_OPROFILE   *om_fs3;     /* optimized 3 codon length frameshift query profile             */
@@ -527,6 +528,7 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
   P7_FS_PROFILE   *gm_tr                    = NULL;
   P7_PROFILE      *gm                       = NULL;
   P7_OPROFILE     *om                       = NULL;       /* optimized query profile                  */
+  P7_OPROFILE     *om_fs                    = NULL;       /* optimized query profile                  */
 
   /* post processing */
   int64_t          resCnt                   = 0;
@@ -752,6 +754,7 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
     gm_tr   = NULL;
     gm      = NULL;
     om      = NULL;       /* optimized query profile                  */
+	om_fs   = NULL;
 
     if(esl_opt_IsUsed(go, "--fs") || esl_opt_IsUsed(go, "--fsonly")) { //check that HMM is properly formated for bathsearch
       if(!(hmm->fsprob && hmm->ct))                      p7_Fail("HMM file %s not formated for frameshift bathsearch. Please run 'bathconvert --fs new_file.bhmm old_file.bhmm'.\n", cfg->queryfile);
@@ -800,9 +803,13 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
     om_fs5 = p7_fs_oprofile_Create(hmm->M, abcAA, p7P_5CODONS);
     gm = p7_profile_Create (hmm->M, abcAA);
     om = p7_oprofile_Create(hmm->M, abcAA);
-    p7_ProfileConfig(hmm, info->bg, gm, NULL, 100, p7_LOCAL, FALSE, FALSE); /* 100 is a dummy length for now; and MSVFilter requires local mode */
+    p7_ProfileConfig(hmm, info->bg, gm, gcode, 100, p7_LOCAL, TRUE, TRUE); /* 100 is a dummy length for now; and MSVFilter requires local mode */
       
     p7_oprofile_Convert(gm, om);                                      /* convert <om> to <gm>*/
+	om->fs = FALSE;
+
+	p7_oprofile_Convert(gm, om_fs);
+
     p7_ProfileConfig_fs(hmm, info->bg, gcode, gm_fs5, 100, p7_LOCAL);  /* build framshift aware codon HMM */
     p7_ProfileConfig_fs(hmm, info->bg, gcode, gm_fs3, 100, p7_LOCAL);
     
@@ -832,6 +839,7 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
       info[i].wrk->orf_block = esl_sq_CreateDigitalBlock(BLOCK_SIZE, abcAA);
       info[i].th     = p7_tophits_Create();
       info[i].om     = p7_oprofile_Clone(om);
+	  info[i].om_fs  = p7_oprofile_Clone(om_fs);
       info[i].gm_fs5 = p7_profile_fs_Clone(gm_fs5);
       info[i].om_fs3 = p7_fs_oprofile_Clone(om_fs3);
       info[i].om_fs5 = p7_fs_oprofile_Clone(om_fs5);
@@ -913,6 +921,7 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
       p7_pipeline_Destroy_BATH(info[i].pli);
       p7_tophits_Destroy(info[i].th);
       p7_oprofile_Destroy(info[i].om);
+	  p7_oprofile_Destroy(info[i].om_fs);
       p7_profile_fs_Destroy(info[i].gm_fs5);
       p7_fs_oprofile_Destroy(info[i].om_fs3);
       p7_fs_oprofile_Destroy(info[i].om_fs5);
@@ -998,6 +1007,7 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
     p7_tophits_Destroy(tophits_accumulator);
     p7_hmmwindow_DestroyList(seed_accumulator);
     p7_oprofile_Destroy(om);
+	p7_oprofile_Destroy(om_fs);
     p7_profile_Destroy(gm);
     p7_profile_fs_Destroy(gm_fs5);
     p7_profile_fs_Destroy(gm_fs3);
