@@ -2738,6 +2738,7 @@ utest_forward_fs(ESL_GETOPTS *go, ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA, P7_COD
 
 	  if (p7_GForward_Frameshift(dsqDNA, (sq->n*3), gm_fs5, fwd, iv, &fsc)      != eslOK) esl_fatal("forward failed");
 	  if (p7_GForward_Frameshift_New(dsqDNA, (sq->n*3), gm, fwd, iv, &new_fsc)  != eslOK) esl_fatal("New forward failed");
+      printf("fsc %f new_fsc %f\n", fsc, new_fsc);
 	  p7_bg_SetLength(bgAA,  sq->n);
 
       p7_bg_fs_NullOne(bgAA, dsqAA, sq->n, &nullsc);	  
