@@ -3024,8 +3024,8 @@ utest_forward_fs(ESL_GETOPTS *go, ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA, P7_COD
       p7_gmx_Reuse(bck);
 
       if (fabs(fsc_p-bsc_p) > 0.001) esl_fatal("Forward Parser 3 /Backward Parser 3 failed: %f %f\n", fsc_p, bsc_p);
-	  if (p7_GForward_Frameshift_New(dsqDNA, (sq->n*3), gm, fwd, iv, &new_fsc)  != eslOK) esl_fatal("New forward failed");
-	  if (p7_GBackward_Frameshift_New(dsqDNA, (sq->n*3), gm, bck, iv, &new_bsc)  != eslOK) esl_fatal("New backward failed");
+      if (p7_GForward_Frameshift_New(dsqDNA, L, gm, fwd, iv, &new_fsc)  != eslOK) esl_fatal("New forward failed");
+      if (p7_GBackward_Frameshift_New(dsqDNA, L, gm, bck, iv, &new_bsc) != eslOK) esl_fatal("New backward failed");
 
 	  if (fabs(new_fsc-new_bsc) > 0.001) esl_fatal("New Forward/Backward failed: %f %f\n", new_fsc, new_bsc);
       if (esl_opt_GetBoolean(go, "--vv")) 
