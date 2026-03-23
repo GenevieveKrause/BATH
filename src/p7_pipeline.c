@@ -787,7 +787,8 @@ p7_pli_computeAliScores_BATH(P7_DOMAIN *dom, P7_TRACE *tr, const ESL_SQ *seq, co
         dom->scores_per_pos[n] = p7P_MSC_AMINO3(gm_fs, k, amino);
       else if(gm_fs->codon_lengths == 1)
         dom->scores_per_pos[n] = p7P_MSC_AMINO1(gm_fs, k, amino);
-
+      if(dom->scores_per_pos[n] == -eslINFINITY)
+          dom->scores_per_pos[n] = 0.;
       if (tr->st[z1-1] == p7T_I)
         dom->scores_per_pos[n] += p7P_TSC(gm_fs, k-1, p7P_IM);
       else if (tr->st[z1-1] == p7T_D)
@@ -855,7 +856,9 @@ p7_pli_computeAliScores_BATH(P7_DOMAIN *dom, P7_TRACE *tr, const ESL_SQ *seq, co
           dom->scores_per_pos[n] = p7P_MSC_AMINO3(gm_fs, k, amino);
         else if(gm_fs->codon_lengths == 1)
           dom->scores_per_pos[n] = p7P_MSC_AMINO1(gm_fs, k, amino);
-
+        
+        if(dom->scores_per_pos[n] == -eslINFINITY)
+          dom->scores_per_pos[n] = 0.;
         dom->scores_per_pos[n] += p7P_TSC(gm_fs, k-1, p7P_MM);
         dom->k_per_pos[n] = k;
         k++; z1++; n++;
@@ -886,7 +889,7 @@ p7_pli_computeAliScores_BATH(P7_DOMAIN *dom, P7_TRACE *tr, const ESL_SQ *seq, co
   }
 
   dom->aliscore = 0.0;
-  for (n=0; n<dom->per_pos_len; n++)  dom->aliscore += dom->scores_per_pos[n];
+  for (n=0; n<dom->per_pos_len; n++)  dom->aliscore += dom->scores_per_pos[n]; 
 
   return eslOK;
 
@@ -1362,7 +1365,7 @@ p7_pli_postViterbi_Frameshift_BATH(P7_PIPELINE *pli, P7_OPROFILE *om, P7_OPROFIL
    */
   
   if(P_fs <= pli->F3 && (P_fs_nobias < tot_orf_P || min_P_orf > pli->F3)) { 
-     
+      
     pli->pos_past_fwd += dna_window->length; 
     p7_omx_GrowTo_dpf(pli->oxb_fs, om->M, PARSER_ROWS_BWD, dna_window->length);
     status = p7_BackwardParser_Frameshift_3Codons(subseq, dna_window->length, om_fs3, pli->oxf_fs, pli->oxb_fs, NULL);
