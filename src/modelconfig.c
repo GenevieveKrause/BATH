@@ -373,14 +373,14 @@ p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode
 
             /* one-nucleotide quasicodons (__X or X__) */
 			codon_idx = p7P_CODON1_FS5(x); //__X
-            if (p7P_MSC_AMINO5(gm_fs, k, a) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+            if (p7P_MSC_AMINO5(gm_fs, k, a) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
               p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a);
               p7P_AMINO(gm_fs, k, codon_idx) = a;
               p7P_INDEL(gm_fs, k, codon_idx) = p7P___X;
             }
 
 			codon_idx = p7P_CODON1_FS5(v); //X__
-            if (p7P_MSC_AMINO5(gm_fs, k, a) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+            if (p7P_MSC_AMINO5(gm_fs, k, a) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
               p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a);
               p7P_AMINO(gm_fs, k, codon_idx) = a;
               p7P_INDEL(gm_fs, k, codon_idx) = p7P_X__;
@@ -388,21 +388,21 @@ p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode
 
 			/* two-nucleotide quasicodons (_XX, X_X, XX_) */
             codon_idx = p7P_CODON2_FS5(w, x); //_XX
-            if (p7P_MSC_AMINO5(gm_fs, k, a) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+            if (p7P_MSC_AMINO5(gm_fs, k, a) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
               p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a);
               p7P_AMINO(gm_fs, k, codon_idx) = a;
               p7P_INDEL(gm_fs, k, codon_idx) = p7P__XX;
             }
 
             codon_idx = p7P_CODON2_FS5(v, x); //X_X
-			if (p7P_MSC_AMINO5(gm_fs, k, a) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+			if (p7P_MSC_AMINO5(gm_fs, k, a) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
               p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a);
               p7P_AMINO(gm_fs, k, codon_idx) = a;
               p7P_INDEL(gm_fs, k, codon_idx) = p7P_X_X;
             }
 
 			codon_idx = p7P_CODON2_FS5(v, w); //XX_
-            if (p7P_MSC_AMINO5(gm_fs, k, a) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+            if (p7P_MSC_AMINO5(gm_fs, k, a) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
               p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a);
               p7P_AMINO(gm_fs, k, codon_idx) = a;
               p7P_INDEL(gm_fs, k, codon_idx) = p7P_XX_;
@@ -413,21 +413,21 @@ p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode
             if (a == hmm->abc->Kp-2) { /* stop codon: use best single-substitution */
               for (subn = 0; subn < 4; subn++) {
 				suba = gcode->basic[16 * subn + 4 * w + x];
-                if (p7P_MSC_AMINO5(gm_fs, k, suba) > p7P_MSC_CODON(gm_fs, k, codon_idx)) { 
+                if (p7P_MSC_AMINO5(gm_fs, k, suba) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) { 
 				  p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, suba);
                   p7P_AMINO(gm_fs, k, codon_idx) = suba;
                   p7P_INDEL(gm_fs, k, codon_idx) = p7P_xXX;
                 }
 
 				suba = gcode->basic[16 * v + 4 * subn + x];
-				if (p7P_MSC_AMINO5(gm_fs, k, suba) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+				if (p7P_MSC_AMINO5(gm_fs, k, suba) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
                   p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, suba);
                   p7P_AMINO(gm_fs, k, codon_idx) = suba;
                   p7P_INDEL(gm_fs, k, codon_idx) = p7P_XxX;
                 }
 
 				suba = gcode->basic[16 * v + 4 * w + subn];
-				if (p7P_MSC_AMINO5(gm_fs, k, suba) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+				if (p7P_MSC_AMINO5(gm_fs, k, suba) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
                   p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, suba);
                   p7P_AMINO(gm_fs, k, codon_idx) = suba;
                   p7P_INDEL(gm_fs, k, codon_idx) = p7P_XXx;
@@ -446,7 +446,7 @@ p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode
 
 			  codon = 16 * u + 4 * v + x;  //XXxX
 			  a = gcode->basic[codon];
-			  if (p7P_MSC_AMINO5(gm_fs, k, a) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+			  if (p7P_MSC_AMINO5(gm_fs, k, a) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
                 p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a);
                 p7P_AMINO(gm_fs, k, codon_idx) = a;
                 p7P_INDEL(gm_fs, k, codon_idx) = p7P_XXxX;
@@ -454,7 +454,7 @@ p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode
 
               codon = 16 * u + 4 * w + x;  //XxXX
 			  a = gcode->basic[codon];
-              if (p7P_MSC_AMINO5(gm_fs, k, a) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+              if (p7P_MSC_AMINO5(gm_fs, k, a) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
                 p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a);
                 p7P_AMINO(gm_fs, k, codon_idx) = a;
                 p7P_INDEL(gm_fs, k, codon_idx) = p7P_XxXX;
@@ -462,7 +462,7 @@ p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode
               
               codon = 16 * v + 4 * w + x; //xXXX
 			  a = gcode->basic[codon];
-              if (p7P_MSC_AMINO5(gm_fs, k, a) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+              if (p7P_MSC_AMINO5(gm_fs, k, a) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
                 p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a);
                 p7P_AMINO(gm_fs, k, codon_idx) = a;
                 p7P_INDEL(gm_fs, k, codon_idx) = p7P_xXXX;
@@ -474,7 +474,7 @@ p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode
 
 				codon = 16 * t + 4 * u + x; //XXxxX
 				a = gcode->basic[codon];
-                if (p7P_MSC_AMINO5(gm_fs, k, a) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+                if (p7P_MSC_AMINO5(gm_fs, k, a) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
                   p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a);
                   p7P_AMINO(gm_fs, k, codon_idx) = a;
                   p7P_INDEL(gm_fs, k, codon_idx) = p7P_XXxxX;
@@ -482,7 +482,7 @@ p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode
 
 				codon = 16 * t + 4 * w + x; //XxxXX
                 a = gcode->basic[codon];
-                if (p7P_MSC_AMINO5(gm_fs, k, a) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+                if (p7P_MSC_AMINO5(gm_fs, k, a) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
                   p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a);
                   p7P_AMINO(gm_fs, k, codon_idx) = a;
                   p7P_INDEL(gm_fs, k, codon_idx) = p7P_XxxXX;
@@ -490,7 +490,7 @@ p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode
 
                 codon = 16 * v + 4 * w + x; //xxXXX
                 a = gcode->basic[codon];
-                if (p7P_MSC_AMINO5(gm_fs, k, a) > p7P_MSC_CODON(gm_fs, k, codon_idx)) {
+                if (p7P_MSC_AMINO5(gm_fs, k, a) >= p7P_MSC_CODON(gm_fs, k, codon_idx)) {
                   p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a);
                   p7P_AMINO(gm_fs, k, codon_idx) = a;
                   p7P_INDEL(gm_fs, k, codon_idx) = p7P_xxXXX;
