@@ -423,8 +423,8 @@ p7_GForward_Frameshift(const ESL_DSQ *dsq, int L, const P7_FS_PROFILE *gm_fs5, P
  *            per-codon emission tables.
  *
  *            Frameshift probabilities are applied as log-probability
- *            constants: <two_indel> for 1- and 5-nt quasi-codons,
- *            <one_indel> for 2- and 4-nt quasi-codons, and <no_indel>
+ *            constants: <quasi_codon> for 1- and 5-nt quasi-codons,
+ *            <quasi_codon> for 2- and 4-nt quasi-codons, and <real_codon>
  *            plus the AA match emission for the canonical 3-nt codon.
  *
  *            Caller must have initialized the log-sum calculation
@@ -453,9 +453,8 @@ p7_GForward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
   int          t, u, v, w, x;
   int          ivx_1, ivx_2, ivx_3, ivx_4, ivx_5;
   float        esc       = p7_profile_IsLocal(gm) ? 0 : -eslINFINITY;
-  float        one_indel = log(gm->fsprob);
-  float        two_indel = log(gm->fsprob / 2.0f);
-  float        no_indel  = log(1. - gm->fsprob * 3.0f);
+  float        quasi_codon = log(gm->fsprob);
+  float        real_codon  = log(1. - gm->fsprob * 4.0f);
 
   for (i = 0; i < p7P_5CODONS; i++)
     for (k = 0; k <= M; k++)
@@ -483,7 +482,7 @@ p7_GForward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
   for (k = 1; k <= M; k++) {
     IVX5(1,k) = XMX_FS(0,p7G_B) + TSC(p7P_BM,k-1);
 
-    MMX_FS(1,k,p7G_C1) = IVX5(1,k) + two_indel;
+    MMX_FS(1,k,p7G_C1) = IVX5(1,k) + quasi_codon;
     MMX_FS(1,k,p7G_C2) = -eslINFINITY;
     MMX_FS(1,k,p7G_C3) = -eslINFINITY;
     MMX_FS(1,k,p7G_C4) = -eslINFINITY;
@@ -514,8 +513,8 @@ p7_GForward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
 
   for (k = 1; k <= M; k++) {
     IVX5(2,k) = XMX_FS(1,p7G_B) + TSC(p7P_BM,k-1);
-    MMX_FS(2,k,p7G_C1) = IVX5(2,k) + two_indel;
-    MMX_FS(2,k,p7G_C2) = IVX5(1,k) + one_indel;
+    MMX_FS(2,k,p7G_C1) = IVX5(2,k) + quasi_codon;
+    MMX_FS(2,k,p7G_C2) = IVX5(1,k) + quasi_codon;
     MMX_FS(2,k,p7G_C3) = -eslINFINITY;
     MMX_FS(2,k,p7G_C4) = -eslINFINITY;
     MMX_FS(2,k,p7G_C5) = -eslINFINITY;
@@ -566,13 +565,13 @@ p7_GForward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
                       p7_FLogsum(DMX_FS(i-1,k-1)        + TSC(p7P_DM,k-1),
                                  XMX_FS(i-1,p7G_B)      + TSC(p7P_BM,k-1))));
 
-      MMX_FS(i,k,p7G_C1) = IVX5(ivx_1,k) + two_indel;
-      MMX_FS(i,k,p7G_C2) = IVX5(ivx_2,k) + one_indel;
-      MMX_FS(i,k,p7G_C3) = IVX5(ivx_3,k) + MSC(k) + no_indel;
+      MMX_FS(i,k,p7G_C1) = IVX5(ivx_1,k) + quasi_codon;
+      MMX_FS(i,k,p7G_C2) = IVX5(ivx_2,k) + quasi_codon;
+      MMX_FS(i,k,p7G_C3) = IVX5(ivx_3,k) + MSC(k) + real_codon;
       MMX_FS(i,k,p7G_C4) = -eslINFINITY;
       MMX_FS(i,k,p7G_C5) = -eslINFINITY;
       if (i == 4)
-        MMX_FS(i,k,p7G_C4) = IVX5(ivx_4,k) + one_indel;
+        MMX_FS(i,k,p7G_C4) = IVX5(ivx_4,k) + quasi_codon;
 
       MMX_FS(i,k,p7G_C0) = p7_FLogsum(p7_FLogsum(MMX_FS(i,k,p7G_C1),
                            p7_FLogsum(MMX_FS(i,k,p7G_C2), MMX_FS(i,k,p7G_C3))),
@@ -594,13 +593,13 @@ p7_GForward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
                     p7_FLogsum(DMX_FS(i-1,M-1)        + TSC(p7P_DM,M-1),
                                XMX_FS(i-1,p7G_B)      + TSC(p7P_BM,M-1))));
 
-    MMX_FS(i,M,p7G_C1) = IVX5(ivx_1,M) + two_indel;
-    MMX_FS(i,M,p7G_C2) = IVX5(ivx_2,M) + one_indel;
-    MMX_FS(i,M,p7G_C3) = IVX5(ivx_3,M) + MSC(M) + no_indel;
+    MMX_FS(i,M,p7G_C1) = IVX5(ivx_1,M) + quasi_codon;
+    MMX_FS(i,M,p7G_C2) = IVX5(ivx_2,M) + quasi_codon;
+    MMX_FS(i,M,p7G_C3) = IVX5(ivx_3,M) + MSC(M) + real_codon;
     MMX_FS(i,M,p7G_C4) = -eslINFINITY;
     MMX_FS(i,M,p7G_C5) = -eslINFINITY;
     if (i == 4)
-      MMX_FS(i,M,p7G_C4) = IVX5(ivx_4,M) + one_indel;
+      MMX_FS(i,M,p7G_C4) = IVX5(ivx_4,M) + quasi_codon;
 
     MMX_FS(i,M,p7G_C0) = p7_FLogsum(p7_FLogsum(MMX_FS(i,M,p7G_C1),
                          p7_FLogsum(MMX_FS(i,M,p7G_C2), MMX_FS(i,M,p7G_C3))),
@@ -662,15 +661,15 @@ p7_GForward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
                       p7_FLogsum(DMX_FS(i-1,k-1)          + TSC(p7P_DM,k-1),
                                  XMX_FS(i-1,p7G_B)        + TSC(p7P_BM,k-1))));
 
-      MMX_FS(i,k,p7G_C1) = IVX5(ivx_1,k) + two_indel;
+      MMX_FS(i,k,p7G_C1) = IVX5(ivx_1,k) + quasi_codon;
 
-      MMX_FS(i,k,p7G_C2) = IVX5(ivx_2,k) + one_indel;
+      MMX_FS(i,k,p7G_C2) = IVX5(ivx_2,k) + quasi_codon;
 
-      MMX_FS(i,k,p7G_C3) = IVX5(ivx_3,k) + MSC(k) + no_indel;
+      MMX_FS(i,k,p7G_C3) = IVX5(ivx_3,k) + MSC(k) + real_codon;
 
-      MMX_FS(i,k,p7G_C4) = IVX5(ivx_4,k) + one_indel;
+      MMX_FS(i,k,p7G_C4) = IVX5(ivx_4,k) + quasi_codon;
 
-      MMX_FS(i,k,p7G_C5) = IVX5(ivx_5,k) + two_indel;
+      MMX_FS(i,k,p7G_C5) = IVX5(ivx_5,k) + quasi_codon;
 
       MMX_FS(i,k,p7G_C0) = p7_FLogsum(p7_FLogsum(MMX_FS(i,k,p7G_C1),
                            p7_FLogsum(MMX_FS(i,k,p7G_C2), MMX_FS(i,k,p7G_C3))),
@@ -696,15 +695,15 @@ p7_GForward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
                     p7_FLogsum(DMX_FS(i-1,M-1)          + TSC(p7P_DM,M-1),
                                XMX_FS(i-1,p7G_B)        + TSC(p7P_BM,M-1))));
 
-    MMX_FS(i,M,p7G_C1) = IVX5(ivx_1,M) + two_indel;
+    MMX_FS(i,M,p7G_C1) = IVX5(ivx_1,M) + quasi_codon;
 
-    MMX_FS(i,M,p7G_C2) = IVX5(ivx_2,M) + one_indel;
+    MMX_FS(i,M,p7G_C2) = IVX5(ivx_2,M) + quasi_codon;
 
-    MMX_FS(i,M,p7G_C3) = IVX5(ivx_3,M) + MSC(M) + no_indel;
+    MMX_FS(i,M,p7G_C3) = IVX5(ivx_3,M) + MSC(M) + real_codon;
 
-    MMX_FS(i,M,p7G_C4) = IVX5(ivx_4,M) + one_indel;
+    MMX_FS(i,M,p7G_C4) = IVX5(ivx_4,M) + quasi_codon;
 
-    MMX_FS(i,M,p7G_C5) = IVX5(ivx_5,M) + two_indel;
+    MMX_FS(i,M,p7G_C5) = IVX5(ivx_5,M) + quasi_codon;
 
     MMX_FS(i,M,p7G_C0) = p7_FLogsum(p7_FLogsum(MMX_FS(i,M,p7G_C1),
                          p7_FLogsum(MMX_FS(i,M,p7G_C2), MMX_FS(i,M,p7G_C3))),
@@ -1732,8 +1731,8 @@ p7_GBackward_Frameshift(const ESL_DSQ *dsq, int L, const P7_FS_PROFILE *gm_fs5, 
  *            per-codon emission tables.
  *
  *            Frameshift probabilities are applied as log-probability
- *            constants: <two_indel> for 1- and 5-nt quasi-codons,
- *            <one_indel> for 2- and 4-nt quasi-codons, and <no_indel>
+ *            constants: <quasi_codon> for 1- and 5-nt quasi-codons,
+ *            <quasi_codon> for 2- and 4-nt quasi-codons, and <real_codon>
  *            plus the AA match emission for the canonical 3-nt codon.
  *
  *            Caller must have initialized the log-sum calculation
@@ -1761,9 +1760,8 @@ p7_GBackward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_
   int          codon;
   int          t, u, v, w, x;
   float        esc       = p7_profile_IsLocal(gm) ? 0 : -eslINFINITY;
-  float        one_indel = log(gm->fsprob);
-  float        two_indel = log(gm->fsprob / 2.0f);
-  float        no_indel  = log(1. - gm->fsprob * 3.0f);
+  float        quasi_codon = log(gm->fsprob);
+  float        real_codon  = log(1. - gm->fsprob * 4.0f);
 
   for (k = 0; k <= M; k++)
     ivx[k] = -eslINFINITY;
@@ -1791,11 +1789,11 @@ p7_GBackward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_
   if (dsq[L] < p7P_MAXNUC) x = dsq[L];
   else                      x = p7P_MAXCODONS;
 
-  ivx[1] = MMX(L,1) + two_indel;
+  ivx[1] = MMX(L,1) + quasi_codon;
   XMX(L-1,p7G_B) = ivx[1] + TSC(p7P_BM,0);
   for (k = 2; k <= M; k++)
   {
-    ivx[k] = MMX(L,k) + two_indel;
+    ivx[k] = MMX(L,k) + quasi_codon;
     XMX(L-1,p7G_B) = p7_FLogsum( XMX(L-1,p7G_B), ivx[k] + TSC(p7P_BM,k-1));
   }
 
@@ -1825,13 +1823,13 @@ p7_GBackward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_
   if (dsq[L-1] < p7P_MAXNUC) x = dsq[L-1];
   else                        x = p7P_MAXCODONS;
 
-  ivx[1] = p7_FLogsum( MMX(L-1,1) + two_indel,
-                        MMX(L,1)   + one_indel);
+  ivx[1] = p7_FLogsum( MMX(L-1,1) + quasi_codon,
+                        MMX(L,1)   + quasi_codon);
   XMX(L-2,p7G_B) = ivx[1] + TSC(p7P_BM,0);
   for (k = 2; k <= M; k++)
   {
-    ivx[k] = p7_FLogsum( MMX(L-1,k) + two_indel,
-                          MMX(L,k)   + one_indel);
+    ivx[k] = p7_FLogsum( MMX(L-1,k) + quasi_codon,
+                          MMX(L,k)   + quasi_codon);
     XMX(L-2,p7G_B) = p7_FLogsum( XMX(L-2,p7G_B), ivx[k] + TSC(p7P_BM,k-1));
   }
 
@@ -1873,21 +1871,21 @@ p7_GBackward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_
     aa    = p7P_AA(gm, codon);
     float const *rsc = gm->rsc[aa];
 
-    ivx[1] = p7_FLogsum(            MMX(i+1,1) + two_indel,
-             p7_FLogsum(            MMX(i+2,1) + one_indel,
-                                    MMX(i+3,1) + MSC(1) + no_indel));
+    ivx[1] = p7_FLogsum(            MMX(i+1,1) + quasi_codon,
+             p7_FLogsum(            MMX(i+2,1) + quasi_codon,
+                                    MMX(i+3,1) + MSC(1) + real_codon));
     if (i == L-4)
-      ivx[1] = p7_FLogsum(ivx[1],  MMX(i+4,1) + one_indel);
+      ivx[1] = p7_FLogsum(ivx[1],  MMX(i+4,1) + quasi_codon);
 
     XMX(i,p7G_B) = ivx[1] + TSC(p7P_BM,0);
 
     for (k = 2; k <= M; k++)
     {
-      ivx[k] = p7_FLogsum(           MMX(i+1,k) + two_indel,
-               p7_FLogsum(           MMX(i+2,k) + one_indel,
-                                     MMX(i+3,k) + MSC(k) + no_indel));
+      ivx[k] = p7_FLogsum(           MMX(i+1,k) + quasi_codon,
+               p7_FLogsum(           MMX(i+2,k) + quasi_codon,
+                                     MMX(i+3,k) + MSC(k) + real_codon));
       if (i == L-4)
-        ivx[k] = p7_FLogsum(ivx[k], MMX(i+4,k) + one_indel);
+        ivx[k] = p7_FLogsum(ivx[k], MMX(i+4,k) + quasi_codon);
 
       XMX(i,p7G_B) = p7_FLogsum( XMX(i,p7G_B), ivx[k] + TSC(p7P_BM,k-1));
     }
@@ -1938,21 +1936,21 @@ p7_GBackward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_
     aa    = p7P_AA(gm, codon);
     float const *rsc = gm->rsc[aa];
 
-    ivx[1] = p7_FLogsum( MMX(i+1,1) + two_indel,
-             p7_FLogsum( MMX(i+2,1) + one_indel,
-             p7_FLogsum( MMX(i+3,1) + MSC(1) + no_indel,
-             p7_FLogsum( MMX(i+4,1) + one_indel,
-                         MMX(i+5,1) + two_indel))));
+    ivx[1] = p7_FLogsum( MMX(i+1,1) + quasi_codon,
+             p7_FLogsum( MMX(i+2,1) + quasi_codon,
+             p7_FLogsum( MMX(i+3,1) + MSC(1) + real_codon,
+             p7_FLogsum( MMX(i+4,1) + quasi_codon,
+                         MMX(i+5,1) + quasi_codon))));
 
     XMX(i,p7G_B) = ivx[1] + TSC(p7P_BM,0);
 
     for (k = 2; k <= M; k++)
     {
-      ivx[k] = p7_FLogsum( MMX(i+1,k) + two_indel,
-               p7_FLogsum( MMX(i+2,k) + one_indel,
-               p7_FLogsum( MMX(i+3,k) + MSC(k) + no_indel,
-               p7_FLogsum( MMX(i+4,k) + one_indel,
-                           MMX(i+5,k) + two_indel))));
+      ivx[k] = p7_FLogsum( MMX(i+1,k) + quasi_codon,
+               p7_FLogsum( MMX(i+2,k) + quasi_codon,
+               p7_FLogsum( MMX(i+3,k) + MSC(k) + real_codon,
+               p7_FLogsum( MMX(i+4,k) + quasi_codon,
+                           MMX(i+5,k) + quasi_codon))));
 
       XMX(i,p7G_B) = p7_FLogsum( XMX(i, p7G_B), ivx[k] + TSC(p7P_BM,k-1));
     }
@@ -2001,21 +1999,21 @@ p7_GBackward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_
   aa    = p7P_AA(gm, codon);
   float const *rsc = gm->rsc[aa];
 
-  ivx[1] = p7_FLogsum( MMX(1,1) + two_indel,
-           p7_FLogsum( MMX(2,1) + one_indel,
-           p7_FLogsum( MMX(3,1) + MSC(1) + no_indel,
-           p7_FLogsum( MMX(4,1) + one_indel,
-                       MMX(5,1) + two_indel))));
+  ivx[1] = p7_FLogsum( MMX(1,1) + quasi_codon,
+           p7_FLogsum( MMX(2,1) + quasi_codon,
+           p7_FLogsum( MMX(3,1) + MSC(1) + real_codon,
+           p7_FLogsum( MMX(4,1) + quasi_codon,
+                       MMX(5,1) + quasi_codon))));
 
   XMX(0,p7G_B) = ivx[1] + TSC(p7P_BM,0);
 
   for (k = 2; k <= M; k++)
   {
-    ivx[k] = p7_FLogsum( MMX(1,k) + two_indel,
-             p7_FLogsum( MMX(2,k) + one_indel,
-             p7_FLogsum( MMX(3,k) + MSC(k) + no_indel,
-             p7_FLogsum( MMX(4,k) + one_indel,
-                         MMX(5,k) + two_indel))));
+    ivx[k] = p7_FLogsum( MMX(1,k) + quasi_codon,
+             p7_FLogsum( MMX(2,k) + quasi_codon,
+             p7_FLogsum( MMX(3,k) + MSC(k) + real_codon,
+             p7_FLogsum( MMX(4,k) + quasi_codon,
+                         MMX(5,k) + quasi_codon))));
 
     XMX(0,p7G_B) = p7_FLogsum(XMX(0, p7G_B), ivx[k] + TSC(p7P_BM,k-1));
   }

@@ -1716,10 +1716,11 @@ p7_ForwardParser_Frameshift_5Codons_New(const ESL_DSQ *dsq, int L, const P7_OPRO
   int      codon, aa;
   int      status;
 
-  /* Frameshift probability constants (probability space) */
-  __m128  two_indel_v = _mm_set1_ps(om->fsprob / 2.0f);
-  __m128  one_indel_v = _mm_set1_ps(om->fsprob);
-  __m128  no_indel_v  = _mm_set1_ps(1.0f - om->fsprob * 3.0f);
+  /* Frameshift probability constants (probability space).
+   * All quasi-codons (C1,C2,C4,C5) share the same flat penalty; only
+   * the in-frame 3-nt codon (C3) uses the complementary real_codon weight. */
+  __m128  quasi_codon_v = _mm_set1_ps(om->fsprob);
+  __m128  real_codon_v  = _mm_set1_ps(1.0f - om->fsprob * 4.0f);
 
   fwd->M              = om->M;
   fwd->L              = L;
@@ -1758,7 +1759,7 @@ p7_ForwardParser_Frameshift_5Codons_New(const ESL_DSQ *dsq, int L, const P7_OPRO
   if (dsq[1] < p7P_MAXNUC) x = dsq[1]; else x = p7P_MAXNUC;
 
   /*----------------------------------------------------------------
-   * Initialization: i=1 (only C1; scored with two_indel_v)
+   * Initialization: i=1 (only C1; scored with quasi_codon_v)
    *----------------------------------------------------------------*/
   i     = 1;
   curr  = 1;
@@ -1784,7 +1785,7 @@ p7_ForwardParser_Frameshift_5Codons_New(const ESL_DSQ *dsq, int L, const P7_OPRO
       sv  = _mm_add_ps(sv, _mm_mul_ps(dpv1, *tp)); tp++;
       IVX(ivx_1, q) = sv;
 
-      msv = _mm_mul_ps(sv, two_indel_v);
+      msv = _mm_mul_ps(sv, quasi_codon_v);
       xEv = _mm_add_ps(xEv, msv);
 
       MMO(dpc, q) = msv;
@@ -1880,7 +1881,7 @@ p7_ForwardParser_Frameshift_5Codons_New(const ESL_DSQ *dsq, int L, const P7_OPRO
   fwd->xmx[1*p7X_NXCELLS+p7X_C] = xC;
 
   /*----------------------------------------------------------------
-   * Initialization: i=2 (C1: two_indel_v, C2: one_indel_v)
+   * Initialization: i=2 (C1: quasi_codon_v, C2: quasi_codon_v)
    *----------------------------------------------------------------*/
   i = 2;
   t = u = v = p7P_MAXNUC;
@@ -1914,8 +1915,8 @@ p7_ForwardParser_Frameshift_5Codons_New(const ESL_DSQ *dsq, int L, const P7_OPRO
       sv  = _mm_add_ps(sv, _mm_mul_ps(dpv1, *tp)); tp++;
       IVX(ivx_1, q) = sv;
 
-      msv =                _mm_mul_ps(sv,              two_indel_v);
-      msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_2, q), one_indel_v));
+      msv =                _mm_mul_ps(sv,              quasi_codon_v);
+      msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_2, q), quasi_codon_v));
       xEv = _mm_add_ps(xEv, msv);
 
       mpv1 = MMO(dpp1, q);
@@ -2016,7 +2017,7 @@ p7_ForwardParser_Frameshift_5Codons_New(const ESL_DSQ *dsq, int L, const P7_OPRO
 
   /*----------------------------------------------------------------
    * Main recurrence: i = 3..L
-   * C3: codon = p7P_CODON(v,w,x), aa = om->codons[...], rfv[aa][q]*no_indel_v
+   * C3: codon = p7P_CODON(v,w,x), aa = om->codons[...], rfv[aa][q]*real_codon_v
    * C1/C2/C4/C5: probability constants only
    * No insert_adj needed: all PARSER_ROWS_FWD circular rows share running scale
    *----------------------------------------------------------------*/
@@ -2063,11 +2064,11 @@ p7_ForwardParser_Frameshift_5Codons_New(const ESL_DSQ *dsq, int L, const P7_OPRO
           sv  = _mm_add_ps(sv, _mm_mul_ps(dpv1, *tp)); tp++;
           IVX(ivx_1, q) = sv;
 
-          msv =                _mm_mul_ps(sv,               two_indel_v);
-          msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_2, q),  one_indel_v));
-          msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_3, q),  _mm_mul_ps(om->rfv[aa][q], no_indel_v)));
-          msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_4, q),  one_indel_v));
-          msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_5, q),  two_indel_v));
+          msv =                _mm_mul_ps(sv,               quasi_codon_v);
+          msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_2, q),  quasi_codon_v));
+          msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_3, q),  _mm_mul_ps(om->rfv[aa][q], real_codon_v)));
+          msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_4, q),  quasi_codon_v));
+          msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_5, q),  quasi_codon_v));
           xEv = _mm_add_ps(xEv, msv);
 
           mpv1 = MMO(dpp1, q);
@@ -3240,10 +3241,11 @@ p7_Forward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, P7_O
   float    insert_adj;                   /* scale correction for I(i,k) from dpf[i-3]     */
   int      status;
 
-  /* Frameshift probability constants (probability space) */
-  __m128  two_indel_v = _mm_set1_ps(om->fsprob / 2.0f);
-  __m128  one_indel_v = _mm_set1_ps(om->fsprob);
-  __m128  no_indel_v  = _mm_set1_ps(1.0f - om->fsprob * 3.0f);
+  /* Frameshift probability constants (probability space).
+   * All quasi-codons (C1,C2,C4,C5) share the same flat penalty; only
+   * the in-frame 3-nt codon (C3) uses the complementary real_codon weight. */
+  __m128  quasi_codon_v = _mm_set1_ps(om->fsprob);
+  __m128  real_codon_v  = _mm_set1_ps(1.0f - om->fsprob * 4.0f);
 
   fwd->M              = om->M;
   fwd->L              = L;
@@ -3292,7 +3294,7 @@ p7_Forward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, P7_O
 
   /*----------------------------------------------------------------
    * Initialization: i=1 (only 1-nt codon C1)
-   * C1: scored with two_indel_v constant only (no AA emission)
+   * C1: scored with quasi_codon_v constant only (no AA emission)
    *----------------------------------------------------------------*/
   i = 1;
 
@@ -3317,7 +3319,7 @@ p7_Forward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, P7_O
       IVX(ivx_1, q) = sv;
 
       /* M_C1(1,q): 1-nt codon; score = IVX * two_indel (no AA emission) */
-      msv = _mm_mul_ps(sv, two_indel_v);
+      msv = _mm_mul_ps(sv, quasi_codon_v);
       MMO_FS(dpc, q, p7X_FS_C0) = msv;
       MMO_FS(dpc, q, p7X_FS_C1) = msv;
       MMO_FS(dpc, q, p7X_FS_C2) = zerov;
@@ -3425,7 +3427,7 @@ p7_Forward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, P7_O
 
   /*----------------------------------------------------------------
    * Initialization: i=2 (1-nt and 2-nt codons C1, C2)
-   * C1: two_indel_v; C2: one_indel_v; no AA emission for either
+   * C1: quasi_codon_v; C2: quasi_codon_v; no AA emission for either
    *----------------------------------------------------------------*/
   i = 2;
   t = u = v = p7P_MAXNUC;
@@ -3456,8 +3458,8 @@ p7_Forward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, P7_O
       IVX(ivx_1, q) = sv;
 
       /* C1: IVX * two_indel; C2: IVX(i-1) * one_indel; no AA emission */
-      __m128 mc1 = _mm_mul_ps(sv,              two_indel_v);
-      __m128 mc2 = _mm_mul_ps(IVX(ivx_2, q),  one_indel_v);
+      __m128 mc1 = _mm_mul_ps(sv,              quasi_codon_v);
+      __m128 mc2 = _mm_mul_ps(IVX(ivx_2, q),  quasi_codon_v);
       msv = _mm_add_ps(mc1, mc2);
       xEv = _mm_add_ps(xEv, msv);
 
@@ -3572,7 +3574,7 @@ p7_Forward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, P7_O
    * Main recurrence: i = 3..L
    *
    * C3 (in-frame): codon = p7P_CODON(v,w,x); aa = om->codons[codon];
-   *                scored as IVX(i-2,q) * rfv[aa][q] * no_indel_v
+   *                scored as IVX(i-2,q) * rfv[aa][q] * real_codon_v
    * C1/C2/C4/C5 (frameshifted): probability constants only, no AA emission
    * I(i,k) = M(i-3,k)*MI + I(i-3,k)*II  (scale-corrected)
    * D(i,k) = M(i,k-1)*MD + D(i,k-1)*DD
@@ -3624,15 +3626,15 @@ p7_Forward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, P7_O
           IVX(ivx_1, q) = sv;
 
           /* C1: IVX(i)   * two_indel (no AA emission) */
-          __m128 mc1 = _mm_mul_ps(sv,               two_indel_v);
+          __m128 mc1 = _mm_mul_ps(sv,               quasi_codon_v);
           /* C2: IVX(i-1) * one_indel (no AA emission) */
-          __m128 mc2 = _mm_mul_ps(IVX(ivx_2, q),   one_indel_v);
+          __m128 mc2 = _mm_mul_ps(IVX(ivx_2, q),   quasi_codon_v);
           /* C3: IVX(i-2) * rfv[aa][q] * no_indel (in-frame codon with AA emission) */
-          __m128 mc3 = _mm_mul_ps(IVX(ivx_3, q),   _mm_mul_ps(om->rfv[aa][q], no_indel_v));
+          __m128 mc3 = _mm_mul_ps(IVX(ivx_3, q),   _mm_mul_ps(om->rfv[aa][q], real_codon_v));
           /* C4: IVX(i-3) * one_indel (no AA emission) */
-          __m128 mc4 = _mm_mul_ps(IVX(ivx_4, q),   one_indel_v);
+          __m128 mc4 = _mm_mul_ps(IVX(ivx_4, q),   quasi_codon_v);
           /* C5: IVX(i-4) * two_indel (no AA emission) */
-          __m128 mc5 = _mm_mul_ps(IVX(ivx_5, q),   two_indel_v);
+          __m128 mc5 = _mm_mul_ps(IVX(ivx_5, q),   quasi_codon_v);
           msv = _mm_add_ps(_mm_add_ps(_mm_add_ps(mc1, mc2), _mm_add_ps(mc3, mc4)), mc5);
           xEv = _mm_add_ps(xEv, msv);
 
@@ -4208,10 +4210,11 @@ p7_Backward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, con
   float    adj2, adj3, adj4, adj5;
   int      status;
 
-  /* Frameshift probability constants (probability space) */
-  __m128  two_indel_v = _mm_set1_ps(om->fsprob / 2.0f);
-  __m128  one_indel_v = _mm_set1_ps(om->fsprob);
-  __m128  no_indel_v  = _mm_set1_ps(1.0f - om->fsprob * 3.0f);
+  /* Frameshift probability constants (probability space).
+   * All quasi-codons (C1,C2,C4,C5) share the same flat penalty; only
+   * the in-frame 3-nt codon (C3) uses the complementary real_codon weight. */
+  __m128  quasi_codon_v = _mm_set1_ps(om->fsprob);
+  __m128  real_codon_v  = _mm_set1_ps(1.0f - om->fsprob * 4.0f);
 
   bck->M              = om->M;
   bck->L              = L;
@@ -4336,11 +4339,11 @@ p7_Backward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, con
       register __m128 adj5v = _mm_set1_ps(adj5);
 
       /* Pre-fold scale corrections with frameshift constants (outside q-loop) */
-      register __m128 c1v = two_indel_v;
-      register __m128 c2v = _mm_mul_ps(one_indel_v, adj2v);
-      register __m128 c3v = _mm_mul_ps(no_indel_v,  adj3v);  /* times rfv[aa][q] in loop */
-      register __m128 c4v = _mm_mul_ps(one_indel_v, adj4v);
-      register __m128 c5v = _mm_mul_ps(two_indel_v, adj5v);
+      register __m128 c1v = quasi_codon_v;
+      register __m128 c2v = _mm_mul_ps(quasi_codon_v, adj2v);
+      register __m128 c3v = _mm_mul_ps(real_codon_v,  adj3v);  /* times rfv[aa][q] in loop */
+      register __m128 c4v = _mm_mul_ps(quasi_codon_v, adj4v);
+      register __m128 c5v = _mm_mul_ps(quasi_codon_v, adj5v);
 
       /* Phase 1: ivxf[q] = sum of codon contributions into each model position */
       for (q = 0; q < Q; q++)
@@ -4473,11 +4476,11 @@ p7_Backward_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, con
     register __m128 adj4v = _mm_set1_ps(adj4);
     register __m128 adj5v = _mm_set1_ps(adj5);
 
-    register __m128 c1v = two_indel_v;
-    register __m128 c2v = _mm_mul_ps(one_indel_v, adj2v);
-    register __m128 c3v = _mm_mul_ps(no_indel_v,  adj3v);
-    register __m128 c4v = _mm_mul_ps(one_indel_v, adj4v);
-    register __m128 c5v = _mm_mul_ps(two_indel_v, adj5v);
+    register __m128 c1v = quasi_codon_v;
+    register __m128 c2v = _mm_mul_ps(quasi_codon_v, adj2v);
+    register __m128 c3v = _mm_mul_ps(real_codon_v,  adj3v);
+    register __m128 c4v = _mm_mul_ps(quasi_codon_v, adj4v);
+    register __m128 c5v = _mm_mul_ps(quasi_codon_v, adj5v);
 
     for (q = 0; q < Q; q++)
       ivxf[q] = _mm_add_ps(

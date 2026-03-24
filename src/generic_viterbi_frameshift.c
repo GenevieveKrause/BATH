@@ -399,9 +399,8 @@ p7_GViterbi_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
   int          t, u, v, w, x;
   int          ivx_1, ivx_2, ivx_3, ivx_4, ivx_5;
   float        esc  = p7_profile_IsLocal(gm) ? 0 : -eslINFINITY;
-  float        one_indel  = log(gm->fsprob);
-  float        two_indel  = log(gm->fsprob / 2.0f);
-  float        no_indel   = log(1.- gm->fsprob * 3.0f);
+  float        quasi_codon = log(gm->fsprob);
+  float        real_codon  = log(1.- gm->fsprob * 4.0f);
 
   /* Initialization of the zero row.  */
   XMX_FS(0,p7G_N) = 0.;                                  /* S->N, p=1            */
@@ -424,7 +423,7 @@ p7_GViterbi_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
   for (k = 1; k <= M; k++) {
     IVX(1,k) = XMX_FS(0,p7G_B) + TSC(p7P_BM,k-1);
 
-    MMX_FS(1,k,p7G_C1) = IVX(1,k) + two_indel; 
+    MMX_FS(1,k,p7G_C1) = IVX(1,k) + quasi_codon; 
     MMX_FS(1,k,p7G_C2) = -eslINFINITY;
     MMX_FS(1,k,p7G_C3) = -eslINFINITY;
     MMX_FS(1,k,p7G_C4) = -eslINFINITY;
@@ -455,8 +454,8 @@ p7_GViterbi_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
 
   for (k = 1; k <= M; k++) {
     IVX(2,k) = XMX_FS(1,p7G_B) + TSC(p7P_BM,k-1);
-    MMX_FS(2,k,p7G_C1) = IVX(2,k) + two_indel;
-    MMX_FS(2,k,p7G_C2) = IVX(1,k) + one_indel; 
+    MMX_FS(2,k,p7G_C1) = IVX(2,k) + quasi_codon;
+    MMX_FS(2,k,p7G_C2) = IVX(1,k) + quasi_codon; 
     MMX_FS(2,k,p7G_C3) = -eslINFINITY;
     MMX_FS(2,k,p7G_C4) = -eslINFINITY;
     MMX_FS(2,k,p7G_C5) = -eslINFINITY;
@@ -511,13 +510,13 @@ p7_GViterbi_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
                      ESL_MAX(DMX_FS(i-1,k-1)        + TSC(p7P_DM,k-1),
                              XMX_FS(i-1,p7G_B)      + TSC(p7P_BM,k-1))));
 
-      MMX_FS(i,k,p7G_C1) = IVX(ivx_1,k) + two_indel;
-      MMX_FS(i,k,p7G_C2) = IVX(ivx_2,k) + one_indel; 
-      MMX_FS(i,k,p7G_C3) = IVX(ivx_3,k) + MSC(k) + no_indel;
+      MMX_FS(i,k,p7G_C1) = IVX(ivx_1,k) + quasi_codon;
+      MMX_FS(i,k,p7G_C2) = IVX(ivx_2,k) + quasi_codon; 
+      MMX_FS(i,k,p7G_C3) = IVX(ivx_3,k) + MSC(k) + real_codon;
       MMX_FS(i,k,p7G_C4) = -eslINFINITY;
       MMX_FS(i,k,p7G_C5) = -eslINFINITY;
       if( i == 4 )
-        MMX_FS(i,k,p7G_C4) = IVX(ivx_4,k) + one_indel; 
+        MMX_FS(i,k,p7G_C4) = IVX(ivx_4,k) + quasi_codon; 
 
       MMX_FS(i,k,p7G_C0) = ESL_MAX( MMX_FS(i,k,p7G_C1),
                            ESL_MAX( MMX_FS(i,k,p7G_C2),
@@ -541,13 +540,13 @@ p7_GViterbi_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
                    ESL_MAX(DMX_FS(i-1,M-1)        + TSC(p7P_DM,M-1),
                            XMX_FS(i-1,p7G_B)      + TSC(p7P_BM,M-1))));
 
-    MMX_FS(i,M,p7G_C1) = IVX(ivx_1,M) + two_indel; 
-    MMX_FS(i,M,p7G_C2) = IVX(ivx_2,M) + one_indel;
-    MMX_FS(i,M,p7G_C3) = IVX(ivx_3,M) + MSC(M) + no_indel;
+    MMX_FS(i,M,p7G_C1) = IVX(ivx_1,M) + quasi_codon; 
+    MMX_FS(i,M,p7G_C2) = IVX(ivx_2,M) + quasi_codon;
+    MMX_FS(i,M,p7G_C3) = IVX(ivx_3,M) + MSC(M) + real_codon;
     MMX_FS(i,M,p7G_C4) = -eslINFINITY;
     MMX_FS(i,M,p7G_C5) = -eslINFINITY;
     if( i == 4 )
-      MMX_FS(i,M,p7G_C4) = IVX(ivx_4,M) + one_indel; 
+      MMX_FS(i,M,p7G_C4) = IVX(ivx_4,M) + quasi_codon; 
 
     MMX_FS(i,M,p7G_C0) = ESL_MAX( MMX_FS(i,M,p7G_C1),
                          ESL_MAX( MMX_FS(i,M,p7G_C2),
@@ -618,15 +617,15 @@ p7_GViterbi_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
                      ESL_MAX(DMX_FS(i-1,k-1)          + TSC(p7P_DM,k-1),
                              XMX_FS(i-1,p7G_B)        + TSC(p7P_BM,k-1))));
 
-      MMX_FS(i,k,p7G_C1) = IVX(ivx_1,k) + two_indel; 
+      MMX_FS(i,k,p7G_C1) = IVX(ivx_1,k) + quasi_codon; 
 
-      MMX_FS(i,k,p7G_C2) = IVX(ivx_2,k) + one_indel;
+      MMX_FS(i,k,p7G_C2) = IVX(ivx_2,k) + quasi_codon;
 
-      MMX_FS(i,k,p7G_C3) = IVX(ivx_3,k) + MSC(k) + no_indel;
+      MMX_FS(i,k,p7G_C3) = IVX(ivx_3,k) + MSC(k) + real_codon;
 
-      MMX_FS(i,k,p7G_C4) = IVX(ivx_4,k) + one_indel;
+      MMX_FS(i,k,p7G_C4) = IVX(ivx_4,k) + quasi_codon;
 
-      MMX_FS(i,k,p7G_C5) = IVX(ivx_5,k) + two_indel;
+      MMX_FS(i,k,p7G_C5) = IVX(ivx_5,k) + quasi_codon;
 
       MMX_FS(i,k,p7G_C0) =  ESL_MAX(ESL_MAX(MMX_FS(i,k,p7G_C1),
                             ESL_MAX(MMX_FS(i,k,p7G_C2), MMX_FS(i,k,p7G_C3))),
@@ -652,15 +651,15 @@ p7_GViterbi_Frameshift_New(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_G
                    ESL_MAX(DMX_FS(i-1,M-1)          + TSC(p7P_DM,M-1),
                            XMX_FS(i-1,p7G_B)        + TSC(p7P_BM,M-1))));
 
-    MMX_FS(i,M,p7G_C1) = IVX(ivx_1,M) + two_indel; 
+    MMX_FS(i,M,p7G_C1) = IVX(ivx_1,M) + quasi_codon; 
 
-    MMX_FS(i,M,p7G_C2) = IVX(ivx_2,M) + one_indel;
+    MMX_FS(i,M,p7G_C2) = IVX(ivx_2,M) + quasi_codon;
 
-    MMX_FS(i,M,p7G_C3) = IVX(ivx_3,M) + MSC(M) + no_indel;
+    MMX_FS(i,M,p7G_C3) = IVX(ivx_3,M) + MSC(M) + real_codon;
 
-    MMX_FS(i,M,p7G_C4) = IVX(ivx_4,M) + one_indel;
+    MMX_FS(i,M,p7G_C4) = IVX(ivx_4,M) + quasi_codon;
 
-    MMX_FS(i,M,p7G_C5) = IVX(ivx_5,M) + two_indel;
+    MMX_FS(i,M,p7G_C5) = IVX(ivx_5,M) + quasi_codon;
 
     MMX_FS(i,M,p7G_C0) =  ESL_MAX(ESL_MAX(MMX_FS(i,M,p7G_C1),
                           ESL_MAX(MMX_FS(i,M,p7G_C2), MMX_FS(i,M,p7G_C3))),
