@@ -395,7 +395,6 @@ p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *win
       ddef->nregions++;
       if (is_multidomain_region_frameshift(ddef, i, j))
       {
-	 	
         /* This region appears to contain more than one domain, so we have to
         * resolve it by cluster analysis of posterior trace samples, to define
         * one or more domain envelopes.
@@ -411,12 +410,12 @@ p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *win
         p7_fs_oprofile_ReconfigMultihit(om_fs5, saveL); 
         p7_omx_GrowTo_dpf(pli->fwd_fs, om_fs5->M, j-i+1, j-i+1);
         if (p7_Forward_Frameshift(windowsq->dsq+i-1, j-i+1, om_fs5, pli->fwd_fs, NULL) == eslERANGE)
-          nc = 0; /* forward underflow; no valid traces for this region */
+          nc = -1; /* forward underflow; no valid traces for this region */
         else
           region_trace_ensemble_frameshift(ddef, om_fs5, windowsq->dsq, windowsq->abc, i, j, pli->fwd_fs, &nc);
 
         p7_fs_oprofile_ReconfigUnihit(om_fs5, saveL);
-       
+        p7_oprofile_ReconfigUnihit(om_fs, saveL); 
         /* ddef->n2sc is now set on i..j by the traceback-dependent method */
         last_j2 = 0;
         
@@ -444,16 +443,17 @@ p7_domaindef_ByPosteriorHeuristics_Frameshift_BATH(P7_PIPELINE *pli, ESL_SQ *win
           ddef->nenvelopes++;         
          
          i2 = ESL_MAX(1,i2); // Hacky bug fix to prevent 0 index - real fix requires changes to region_trace_ensemble_frameshift() 
-
           ddef->nenvelopes++;
          if (rescore_isolated_domain_frameshift(ddef, pli, om_fs, om_fs5, gm_fs5, windowsq, i2, j2, bg, gcode) == eslOK) last_j2 = j2;
         }
-
+        if(nc == 0) {
+          ddef->nenvelopes++;
+          rescore_isolated_domain_frameshift(ddef, pli, om_fs, om_fs5, gm_fs5, windowsq, i, j, bg, gcode);
+        }
         p7_spensemble_Reuse(ddef->sp);
         p7_trace_Reuse(ddef->tr);
 
      } else {
-	
       ddef->nenvelopes++;
       rescore_isolated_domain_frameshift(ddef, pli, om_fs, om_fs5, gm_fs5, windowsq, i, j, bg, gcode);
     }
@@ -1011,7 +1011,7 @@ rescore_isolated_domain_frameshift(P7_DOMAINDEF *ddef, P7_PIPELINE *pli, P7_OPRO
   if (om_fs5->codon_lengths != 5) ESL_XEXCEPTION(eslEINVAL, "proflie not allocated for 5 codon lengths");
 
   if (Ld < 15) return eslOK;
- 
+
   p7_bg_SetLength(bg, Ld/3);
   p7_bg_fs_FilterScore(bg, windowsq->dsq+i-1, Ld, gcode, pli->do_biasfilter, &filtersc);
  
@@ -1020,7 +1020,7 @@ rescore_isolated_domain_frameshift(P7_DOMAINDEF *ddef, P7_PIPELINE *pli, P7_OPRO
   p7_omx_GrowTo_dpf(ox1, om_fs5->M, Ld, Ld);
   p7_oprofile_ReconfigLength(om_fs, Ld);
   if ((status = p7_Forward_Frameshift_New(windowsq->dsq+i-1, Ld, om_fs, ox1, &envsc)) == eslERANGE) return eslOK;
-  
+
   //if ((status = p7_Forward_Frameshift(windowsq->dsq+i-1, Ld, om_fs5, ox1, &envsc)) == eslERANGE) return eslOK;
   if (status != eslOK) ESL_XEXCEPTION(status, "forward frameshift failed");
 
@@ -1031,7 +1031,7 @@ rescore_isolated_domain_frameshift(P7_DOMAINDEF *ddef, P7_PIPELINE *pli, P7_OPRO
    * scoring false positive domain(s).  Use the current residue count to 
    * throw away any domains already bellow the reporting threshold before 
    * we do any further calculations */
-
+ 
   pli->Z = (float)pli->nres / (float)gm_fs5->max_length;
   if (pli->inc_by_E  && P * pli->Z > pli->E) {
     p7_omx_Reuse(ox1);
@@ -1070,16 +1070,17 @@ rescore_isolated_domain_frameshift(P7_DOMAINDEF *ddef, P7_PIPELINE *pli, P7_OPRO
   dom->k_per_pos      = NULL;
   dom->aliscore       = 0.0; 
 
+//TODO when aliscore < 0 realign with viterbi
   p7_pli_computeAliScores_BATH(dom, ddef->tr, windowsq, gm_fs5);
 
-  if(dom->aliscore < 0.0) { /* rare: domain is assumed to be repetitive garbage */
-    free(dom->scores_per_pos);
-    free(dom->k_per_pos);
-    dom->scores_per_pos = NULL;
-    dom->k_per_pos = NULL;
-    p7_trace_Reuse(ddef->tr);
-    return eslFAIL;
-  }
+//  if(dom->aliscore < 0.0) { /* rare: domain is assumed to be repetitive garbage */
+//    free(dom->scores_per_pos);
+//    free(dom->k_per_pos);
+//    dom->scores_per_pos = NULL;
+//    dom->k_per_pos = NULL;
+//    p7_trace_Reuse(ddef->tr);
+//    return eslFAIL;
+//  }
 
   /* Compute bias correction */
   p7_Null2_fs_ByExpectation(om_fs5, ox1, null2);
