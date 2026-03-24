@@ -86,6 +86,7 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
   double          lambda, mmu, vmu, tau, tau_fs3, tau_fs5;
   int             status;
 
+  P7_PROFILE  *gm_fs = NULL;
   P7_OPROFILE *om_fs = NULL;
   /* Configure any objects we need
    * that weren't already passed to us as a bypass optimization 
@@ -114,7 +115,7 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
    */
   if ((esl_byp_IsInternal(byp_gm) && ! esl_byp_IsProvided(byp_om)) || esl_byp_IsReturned(byp_gm)) {
     if  ( (gm     = p7_profile_Create(hmm->M, hmm->abc))          == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate profile");
-    if  ( (status = p7_ProfileConfig(hmm, bg, gm, gcode, EvL, p7_LOCAL, TRUE, TRUE)) != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure profile");
+    if  ( (status = p7_ProfileConfig(hmm, bg, gm, NULL, EvL, p7_LOCAL, FALSE, FALSE)) != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure profile");
   }
 
   if (om == NULL) {
@@ -123,8 +124,11 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
 	om->fs = FALSE;
   }
 
+  gm_fs = p7_profile_Create(hmm->M, hmm->abc);
+  p7_ProfileConfig(hmm, bg, gm_fs, gcode, EvL, p7_LOCAL, TRUE, TRUE);
+
   om_fs = p7_oprofile_Create(hmm->M, hmm->abc);
-  p7_oprofile_Convert(gm, om_fs);
+  p7_oprofile_Convert(gm_fs, om_fs);
 
   /* The calibration steps themselves */
   if ((status = p7_Lambda(hmm, bg, &lambda))                             != eslOK) ESL_XFAIL(status,  errbuf, "failed to determine lambda");
@@ -187,6 +191,7 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
   esl_gencode_Destroy(gcode);
   p7_codontable_Destroy(ct);
   p7_oprofile_Destroy(om_fs);
+  p7_profile_Destroy(gm_fs);
   
   return eslOK;
 
@@ -841,6 +846,7 @@ main(int argc, char **argv)
   P7_HMM         *hmm     = NULL;
   P7_BG          *bg      = NULL;
   P7_PROFILE     *gm      = NULL;
+  P7_PROFILE     *gm_fs   = NULL;
   P7_OPROFILE    *om      = NULL;
   P7_OPROFILE    *om_fs   = NULL;
   P7_FS_PROfILE  *gm_fs5  = NULL;
@@ -886,12 +892,14 @@ main(int argc, char **argv)
 
       if (bg == NULL) bg = p7_bg_Create(abc);
       gm = p7_profile_Create(hmm->M, abc);
-      p7_ProfileConfig(hmm, bg, gm, gcode, EvL, p7_LOCAL, TRUE, TRUE); /* the EvL doesn't matter */
+      p7_ProfileConfig(hmm, bg, gm, NULL, EvL, p7_LOCAL, FALSE, FALSE); /* the EvL doesn't matter */
       om = p7_oprofile_Create(hmm->M, abc);
       p7_oprofile_Convert(gm, om);
-      om->fs = FALSE;
+
+	  gm_fs = p7_profile_Create(hmm->M, abc);
+	  p7_ProfileConfig(hmm, bg, gm_fs, gcode, EvL, p7_LOCAL, TRUE, TRUE); /* the EvL doesn't matter */
 	  om_fs = p7_oprofile_Create(hmm->M, abc);
-	  p7_oprofile_Convert(gm, om_fs);
+	  p7_oprofile_Convert(gm_fs, om_fs);
 
       if(abc->type == eslAMINO) {
         if(abcDNA == NULL) abcDNA = esl_alphabet_Create(eslDNA);
@@ -928,6 +936,7 @@ main(int argc, char **argv)
 
       p7_hmm_Destroy(hmm);      
       p7_profile_Destroy(gm);
+	  p7_profile_Destroy(gm_fs);
       p7_oprofile_Destroy(om);
 	  p7_oprofile_Destroy(om_fs);
       p7_fs_oprofile_Destroy(om_fs5);

@@ -527,6 +527,7 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
   P7_FS_OPROFILE  *om_fs5                   = NULL;
   P7_FS_PROFILE   *gm_tr                    = NULL;
   P7_PROFILE      *gm                       = NULL;
+  P7_PROFILE      *gm_fs                    = NULL;
   P7_OPROFILE     *om                       = NULL;       /* optimized query profile                  */
   P7_OPROFILE     *om_fs                    = NULL;       /* optimized query profile                  */
 
@@ -753,6 +754,7 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
     om_fs5  = NULL; 
     gm_tr   = NULL;
     gm      = NULL;
+	gm_fs   = NULL;
     om      = NULL;       /* optimized query profile                  */
 	om_fs   = NULL;
 
@@ -802,15 +804,16 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
     om_fs3 = p7_fs_oprofile_Create(hmm->M, abcAA, p7P_3CODONS);
     om_fs5 = p7_fs_oprofile_Create(hmm->M, abcAA, p7P_5CODONS);
     gm = p7_profile_Create (hmm->M, abcAA);
+	gm_fs = p7_profile_Create (hmm->M, abcAA);
     om = p7_oprofile_Create(hmm->M, abcAA);
     om_fs = p7_oprofile_Create(hmm->M, abcAA);
 
-    p7_ProfileConfig(hmm, info->bg, gm, gcode, 100, p7_LOCAL, TRUE, TRUE); /* 100 is a dummy length for now; and MSVFilter requires local mode */
+    p7_ProfileConfig(hmm, info->bg, gm, NULL, 100, p7_LOCAL, FALSE, FALSE); /* 100 is a dummy length for now; and MSVFilter requires local mode */
+	p7_ProfileConfig(hmm, info->bg, gm_fs, gcode, 100, p7_LOCAL, TRUE, TRUE); /* 100 is a dummy length for now; and MSVFilter requires local mode */
       
     p7_oprofile_Convert(gm, om);                                      /* convert <om> to <gm>*/
-	om->fs = FALSE;
     
-	p7_oprofile_Convert(gm, om_fs);
+	p7_oprofile_Convert(gm_fs, om_fs);
 
     p7_ProfileConfig_fs(hmm, info->bg, gcode, gm_fs5, 100, p7_LOCAL);  /* build framshift aware codon HMM */
     p7_ProfileConfig_fs(hmm, info->bg, gcode, gm_fs3, 100, p7_LOCAL);
@@ -1002,6 +1005,7 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
     p7_oprofile_Destroy(om);
 	p7_oprofile_Destroy(om_fs);
     p7_profile_Destroy(gm);
+	p7_profile_Destroy(gm_fs);
     p7_profile_fs_Destroy(gm_fs5);
     p7_profile_fs_Destroy(gm_fs3);
     p7_fs_oprofile_Destroy(om_fs3);
