@@ -1534,6 +1534,7 @@ if (*ret_abc == NULL) {
         if ((status = esl_fileparser_GetTokenOnLine(hfp->efp, &tok2, NULL))  != eslOK)   ESL_XFAIL(status,    hfp->errbuf, "No frameshift probaility found on FRAMESHIFT PROB line");
         if ((status = esl_fileparser_GetTokenOnLine(hfp->efp, &tok3, NULL))  != eslOK)   ESL_XFAIL(status,    hfp->errbuf, "No frameshift probaility found on FRAMESHIFT PROB line");
         if ((hmm->fsprob = atof(tok3))                                            == 0)     ESL_XFAIL(status,    hfp->errbuf, "Invalid frameshift probability %s on FRAMESHIFT PROB line", tok3);	
+		hmm->fsprob = p7P_FSPROB
       }
 
       else if (strcmp(tag, "CODON") == 0) {

@@ -72,7 +72,7 @@ p7_ProfileConfig(const P7_HMM *hmm, const P7_BG *bg, P7_PROFILE *gm, const ESL_G
 
   if(stops) {
     stop_codon = log(gm->fsprob);
-	non_stop   = log(1.0 - gm->fsprob);
+    non_stop   = log(1.0 - gm->fsprob);
   }
   else {
     stop_codon = -eslINFINITY;
