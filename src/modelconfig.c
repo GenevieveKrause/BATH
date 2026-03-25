@@ -865,8 +865,12 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
           for (x = 0; x < 4; x++) {
             codon = 16*v + 4*w + x;
             a     = gcode->basic[codon];
-            if (a != stop)
-              p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x)) = p7P_MSC_AMINO5(gm_fs, k, a) + no_indel;
+            if (a != stop) {
+              codon_idx = p7P_CODON3_FS5(v,w,x);
+              p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a) + no_indel;
+              p7P_AMINO(gm_fs, k, codon_idx)     = a;
+              p7P_INDEL(gm_fs, k, codon_idx)     = p7P_XXX;
+            }
           }
 
     /* --- Layer 2: stop 3-nt codons --- */
@@ -896,8 +900,11 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
                 if (suba != stop) { lse = p7_FLogsum(lse, p7P_MSC_AMINO5(gm_fs, k, suba)); n++; }
               }
             }
-            p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x)) =
+            codon_idx = p7P_CODON3_FS5(v,w,x);
+            p7P_MSC_CODON(gm_fs, k, codon_idx) =
               (n > 0) ? lse - logf((float)n) + stop_codon : -eslINFINITY;
+            p7P_AMINO(gm_fs, k, codon_idx) = hmm->abc->Kp-3;
+            p7P_INDEL(gm_fs, k, codon_idx) = p7P_xxx;
           }
 
     /* --- Layer 3a: 2-nt quasi-codons (one deletion) ---
@@ -910,7 +917,10 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
           for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(x,v,w))); /* _VW */
           for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,x,w))); /* V_W */
           for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x))); /* VW_ */
-          p7P_MSC_CODON(gm_fs, k, p7P_CODON2_FS5(v,w)) = lse - logf(12.0f) + one_indel;
+          codon_idx = p7P_CODON2_FS5(v,w);
+          p7P_MSC_CODON(gm_fs, k, codon_idx) = lse - logf(12.0f) + one_indel;
+          p7P_AMINO(gm_fs, k, codon_idx)     = hmm->abc->Kp-3;
+          p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
         }
 
     /* --- Layer 3b: 1-nt quasi-codons (two deletions) ---
@@ -923,7 +933,10 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
             lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x))); /* __X */
             lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(x,v,w))); /* X__ */
           }
-        p7P_MSC_CODON(gm_fs, k, p7P_CODON1_FS5(x)) = lse - logf(32.0f) + two_indel;
+        codon_idx = p7P_CODON1_FS5(x);
+        p7P_MSC_CODON(gm_fs, k, codon_idx) = lse - logf(32.0f) + two_indel;
+        p7P_AMINO(gm_fs, k, codon_idx)     = hmm->abc->Kp-3;
+        p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
       }
 
     /* --- Layer 3c: 4-nt quasi-codons (one insertion) ---
@@ -937,7 +950,10 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
                       p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(u,v,x)),  /* XXxX: w inserted */
                       p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(u,w,x))), /* XxXX: v inserted */
                       p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x))); /* xXXX: u inserted */
-              p7P_MSC_CODON(gm_fs, k, p7P_CODON4_FS5(u,v,w,x)) = lse - logf(3.0f) + one_indel;
+              codon_idx = p7P_CODON4_FS5(u,v,w,x);
+              p7P_MSC_CODON(gm_fs, k, codon_idx) = lse - logf(3.0f) + one_indel;
+              p7P_AMINO(gm_fs, k, codon_idx)     = hmm->abc->Kp-3;
+              p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
             }
 
     /* --- Layer 3d: 5-nt quasi-codons (two insertions) ---
@@ -952,7 +968,10 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
                         p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(t,u,x)),  /* XXxxX: v,w inserted */
                         p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(t,w,x))), /* XxxXX: u,v inserted */
                         p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x))); /* xxXXX: t,u inserted */
-                p7P_MSC_CODON(gm_fs, k, p7P_CODON5_FS5(t,u,v,w,x)) = lse - logf(3.0f) + two_indel;
+                codon_idx = p7P_CODON5_FS5(t,u,v,w,x);
+                p7P_MSC_CODON(gm_fs, k, codon_idx) = lse - logf(3.0f) + two_indel;
+                p7P_AMINO(gm_fs, k, codon_idx)     = hmm->abc->Kp-3;
+                p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
               }
 
     /* Degenerate nucleotide placeholders */
@@ -960,12 +979,18 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
     for (k = 1; k <= hmm->M; k++) {
       codon_idx = p7P_DEGEN5_C;
       p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a) + no_indel;
+      p7P_AMINO(gm_fs, k, codon_idx)     = a;
+      p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
 
       codon_idx = p7P_DEGEN5_QC1;
       p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a) + one_indel;
+      p7P_AMINO(gm_fs, k, codon_idx)     = a;
+      p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
 
       codon_idx = p7P_DEGEN5_QC2;
       p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a) + two_indel;
+      p7P_AMINO(gm_fs, k, codon_idx)     = a;
+      p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
     }
   }
   else if (gm_fs->codon_lengths == 3) {
@@ -977,8 +1002,12 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
           for (x = 0; x < 4; x++) {
             codon = 16*v + 4*w + x;
             a     = gcode->basic[codon];
-            if (a != stop)
-              p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(v,w,x)) = p7P_MSC_AMINO3(gm_fs, k, a) + no_indel;
+            if (a != stop) {
+              codon_idx = p7P_CODON3_FS3(v,w,x);
+              p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO3(gm_fs, k, a) + no_indel;
+              p7P_AMINO(gm_fs, k, codon_idx)     = a;
+              p7P_INDEL(gm_fs, k, codon_idx)     = p7P_XXX;
+            }
           }
 
     /* --- Layer 2: stop 3-nt codons --- */
@@ -1005,8 +1034,11 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
                 if (suba != stop) { lse = p7_FLogsum(lse, p7P_MSC_AMINO3(gm_fs, k, suba)); n++; }
               }
             }
-            p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(v,w,x)) =
+            codon_idx = p7P_CODON3_FS3(v,w,x);
+            p7P_MSC_CODON(gm_fs, k, codon_idx) =
               (n > 0) ? lse - logf((float)n) + stop_codon : -eslINFINITY;
+            p7P_AMINO(gm_fs, k, codon_idx) = hmm->abc->Kp-3;
+            p7P_INDEL(gm_fs, k, codon_idx) = p7P_xxx;
           }
 
     /* --- Layer 3a: 2-nt quasi-codons (one deletion) ---
@@ -1018,7 +1050,10 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
           for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(x,v,w))); /* _VW */
           for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(v,x,w))); /* V_W */
           for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(v,w,x))); /* VW_ */
-          p7P_MSC_CODON(gm_fs, k, p7P_CODON2_FS3(v,w)) = lse - logf(12.0f) + one_indel;
+          codon_idx = p7P_CODON2_FS3(v,w);
+          p7P_MSC_CODON(gm_fs, k, codon_idx) = lse - logf(12.0f) + one_indel;
+          p7P_AMINO(gm_fs, k, codon_idx)     = hmm->abc->Kp-3;
+          p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
         }
 
     /* --- Layer 3b: 4-nt quasi-codons (one insertion) ---
@@ -1032,7 +1067,10 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
                       p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(u,v,x)),  /* XXxX: w inserted */
                       p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(u,w,x))), /* XxXX: v inserted */
                       p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(v,w,x))); /* xXXX: u inserted */
-              p7P_MSC_CODON(gm_fs, k, p7P_CODON4_FS3(u,v,w,x)) = lse - logf(3.0f) + one_indel;
+              codon_idx = p7P_CODON4_FS3(u,v,w,x);
+              p7P_MSC_CODON(gm_fs, k, codon_idx) = lse - logf(3.0f) + one_indel;
+              p7P_AMINO(gm_fs, k, codon_idx)     = hmm->abc->Kp-3;
+              p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
             }
 
     /* Degenerate nucleotide placeholders */
@@ -1040,9 +1078,13 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
     for (k = 1; k <= hmm->M; k++) {
       codon_idx = p7P_DEGEN3_C;
       p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO3(gm_fs, k, a) + no_indel;
+      p7P_AMINO(gm_fs, k, codon_idx)     = a;
+      p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
 
       codon_idx = p7P_DEGEN3_QC1;
       p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO3(gm_fs, k, a) + one_indel;
+      p7P_AMINO(gm_fs, k, codon_idx)     = a;
+      p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
     }
   }
   else if (gm_fs->codon_lengths == 1) {
@@ -1053,12 +1095,17 @@ p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *g
           for (x = 0; x < 4; x++) {
             codon = 16*v + 4*w + x;
             a     = gcode->basic[codon];
-            p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS1(v,w,x)) = p7P_MSC_AMINO1(gm_fs, k, a);
+            codon_idx = p7P_CODON3_FS1(v,w,x);
+            p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO1(gm_fs, k, a);
+            p7P_AMINO(gm_fs, k, codon_idx)     = (a != stop) ? a : (ESL_DSQ)(hmm->abc->Kp-3);
+            p7P_INDEL(gm_fs, k, codon_idx)     = p7P_XXX;
           }
     a = hmm->abc->Kp-3;
     for (k = 1; k <= hmm->M; k++) {
       codon_idx = p7P_DEGEN1_C;
       p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO1(gm_fs, k, a);
+      p7P_AMINO(gm_fs, k, codon_idx)     = a;
+      p7P_INDEL(gm_fs, k, codon_idx)     = p7P_xxx;
     }
   }
 
