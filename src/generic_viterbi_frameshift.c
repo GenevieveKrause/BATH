@@ -933,7 +933,7 @@ main(int argc, char **argv)
   p7_bg_SetLength(bgDNA, L);
 
   gm_fs5 = p7_profile_fs_Create(hmm->M, abcAA, p7P_5CODONS);
-  p7_ProfileConfig_fs(hmm, p7_bg_Create(abcAA), gcode, gm_fs5, L/3, p7_UNILOCAL);
+  p7_ProfileConfig_fs_New(hmm, p7_bg_Create(abcAA), gcode, gm_fs5, L/3, p7_UNILOCAL);
 
   gm = p7_profile_Create(hmm->M, abcAA);
   p7_ProfileConfig(hmm, p7_bg_Create(abcAA), gm, gcode, L, p7_UNILOCAL, TRUE, TRUE);
@@ -1165,7 +1165,7 @@ main(int argc, char **argv)
   if (p7_bg_SetLength(bgAA, L/3)                                       != eslOK) esl_fatal("failed to set bg length");
   if ((gm_fs5 = p7_profile_fs_Create(hmm->M, abcAA, 5))                == NULL) esl_fatal("failed to create fs profile");
   if ((gm = p7_profile_Create(hmm->M, abcAA))                          == NULL) esl_fatal("failed to create profile");
-  if (p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs5, L/3, p7_LOCAL)    != eslOK) esl_fatal("failed to configure fs profile");
+  if (p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs5, L/3, p7_LOCAL)    != eslOK) esl_fatal("failed to configure fs profile");
   if (p7_ProfileConfig(hmm, bgAA, gm, gcode, L, p7_LOCAL, TRUE, TRUE) != eslOK) esl_fatal("failed to configure profile");
   if (p7_hmm_Validate(hmm, errbuf, 0.0001)                             != eslOK) esl_fatal("HMM invalid: %s", errbuf);
 

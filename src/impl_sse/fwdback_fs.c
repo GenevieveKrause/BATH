@@ -5444,8 +5444,8 @@ main(int argc, char **argv)
 
   gm_fs5 = p7_profile_fs_Create(hmm->M, abcAA, p7P_5CODONS);
   gm_fs3 = p7_profile_fs_Create(hmm->M, abcAA, p7P_3CODONS);
-  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs5, L/3, p7_UNILOCAL);
-  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs3, L/3, p7_UNILOCAL);
+  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs5, L/3, p7_UNILOCAL);
+  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs3, L/3, p7_UNILOCAL);
 
   om_fs5 = p7_fs_oprofile_Create(hmm->M, abcAA, p7P_5CODONS);
   om_fs3 = p7_fs_oprofile_Create(hmm->M, abcAA, p7P_3CODONS);
@@ -5580,8 +5580,8 @@ utest_fwdbackfs(ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA, ESL_ALPHABET *abcDNA, ES
 
   p7_hmm_Sample(r, M, abcAA, &hmm);
   p7_ProfileConfig(hmm, bgAA, gm, gcode, M, p7_LOCAL, TRUE, TRUE);
-  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs3, M, p7_LOCAL);
-  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs5, M, p7_LOCAL);
+  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs3, M, p7_LOCAL);
+  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs5, M, p7_LOCAL);
 
   p7_fs_oprofile_Convert(gm_fs3, om_fs3);
   p7_fs_oprofile_ReconfigLength(om_fs3, M);

@@ -147,12 +147,12 @@ main(int argc, char **argv)
  
           om_fs3 = p7_fs_oprofile_Create(hmm->M, hmm->abc, p7P_3CODONS);
           gm_fs3 = p7_profile_fs_Create(hmm->M, hmm->abc, p7P_3CODONS);
-          p7_ProfileConfig_fs(hmm, bg, gcode, gm_fs3, 100, p7_LOCAL);
+          p7_ProfileConfig_fs_New(hmm, bg, gcode, gm_fs3, 100, p7_LOCAL);
           p7_fs_oprofile_Convert(gm_fs3, om_fs3);
 
           om_fs5 = p7_fs_oprofile_Create(hmm->M, hmm->abc, p7P_5CODONS);
           gm_fs5 = p7_profile_fs_Create(hmm->M, hmm->abc, p7P_5CODONS);
-          p7_ProfileConfig_fs(hmm, bg, gcode, gm_fs5, 100, p7_LOCAL);
+          p7_ProfileConfig_fs_New(hmm, bg, gcode, gm_fs5, 100, p7_LOCAL);
           p7_fs_oprofile_Convert(gm_fs5, om_fs5);
 
 		  om_fs = p7_oprofile_Create(hmm->M, hmm->abc);

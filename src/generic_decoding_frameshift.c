@@ -359,7 +359,7 @@ main(int argc, char **argv)
   abcDNA = esl_alphabet_Create(eslDNA); 
   bgAA   = p7_bg_Create(abcAA);                  p7_bg_SetLength(bgAA, L/3);
   gcode  = esl_gencode_Create(abcDNA,abcAA);
-  gm_fs5 = p7_profile_fs_Create(hmm->M, abcAA, p7P_5CODONS);  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs5, L/3, p7_LOCAL);
+  gm_fs5 = p7_profile_fs_Create(hmm->M, abcAA, p7P_5CODONS);  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs5, L/3, p7_LOCAL);
   fwd    = p7_gmx_Create(gm_fs5->M, L, L, p7G_NSCELLS_FS);  
   bck    = p7_gmx_Create(gm_fs5->M, L, L, p7G_NSCELLS);
   iv     = p7_ivx_Create(gm_fs5->M, p7P_5CODONS);

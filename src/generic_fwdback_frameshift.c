@@ -2867,8 +2867,8 @@ main(int argc, char **argv)
   bgAA  = p7_bg_Create(abcAA);
   gm_fs5 = p7_profile_fs_Create(hmm->M, abcAA, p7P_5CODONS);
   gm_fs3 = p7_profile_fs_Create(hmm->M, abcAA, p7P_3CODONS);
-  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs5, L/3, p7_UNILOCAL);
-  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs3, L/3, p7_UNILOCAL);
+  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs5, L/3, p7_UNILOCAL);
+  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs3, L/3, p7_UNILOCAL);
 
   fwd_p = p7_gmx_Create(gm_fs5->M, PARSER_ROWS_FWD, L, p7G_NSCELLS);
   bck_p = p7_gmx_Create(gm_fs5->M, PARSER_ROWS_BWD, L, p7G_NSCELLS);
@@ -3151,9 +3151,9 @@ main(int argc, char **argv)
   if ((gm = p7_profile_Create(hmm->M, abcAA))                   == NULL)  esl_fatal("failed to create profile");
   if ((p7_ProfileConfig(hmm, bgAA, gm, gcode, L, p7_LOCAL, TRUE, TRUE))            != eslOK) esl_fatal("failed to config profile");
   if ((gm_fs5 = p7_profile_fs_Create(hmm->M, abcAA, 5))           == NULL)  esl_fatal("failed to create profile");
-  if (p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs5, L/3, p7_LOCAL) != eslOK) esl_fatal("failed to config profile");
+  if (p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs5, L/3, p7_LOCAL) != eslOK) esl_fatal("failed to config profile");
   if ((gm_fs3 = p7_profile_fs_Create(hmm->M, abcAA, 3))           == NULL)  esl_fatal("failed to create profile");
-  if (p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs3, L/3, p7_LOCAL) != eslOK) esl_fatal("failed to config profile");
+  if (p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs3, L/3, p7_LOCAL) != eslOK) esl_fatal("failed to config profile");
   if (p7_hmm_Validate    (hmm, errbuf, 0.0001)      != eslOK) esl_fatal("whoops, HMM is bad!: %s", errbuf);
 
   utest_forward_fs    (go, r, abcAA, ct, bgAA, hmm, gm, gm_fs3, gm_fs5, nseq, L);

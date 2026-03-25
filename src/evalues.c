@@ -142,13 +142,13 @@ p7_Calibrate(P7_HMM *hmm, P7_BUILDER *cfg_b, ESL_RANDOMNESS **byp_rng, P7_BG **b
       if(om_fs5 == NULL) {
       if  ( (om_fs5  = p7_fs_oprofile_Create(hmm->M, hmm->abc, p7P_5CODONS))       == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate oprofile");
       if  ( (gm_fs5  = p7_profile_fs_Create(hmm->M, hmm->abc, p7P_5CODONS))        == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate profile");
-      if  ( (status  = p7_ProfileConfig_fs(hmm, bg, gcode, gm_fs5, EvL, p7_LOCAL)) != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure profile");
+      if  ( (status  = p7_ProfileConfig_fs_New(hmm, bg, gcode, gm_fs5, EvL, p7_LOCAL)) != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure profile");
       if  ( (status  = p7_fs_oprofile_Convert(gm_fs5, om_fs5))                     != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure oprofile");
     }  
     if(om_fs3 == NULL) {
       if  ( (om_fs3  = p7_fs_oprofile_Create(hmm->M, hmm->abc, p7P_3CODONS))       == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate oprofile");
       if  ( (gm_fs3  = p7_profile_fs_Create(hmm->M, hmm->abc, p7P_3CODONS))        == NULL)  ESL_XFAIL(eslEMEM, errbuf, "failed to allocate profile");
-      if  ( (status  = p7_ProfileConfig_fs(hmm, bg, gcode, gm_fs3, EvL, p7_LOCAL)) != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure profile");
+      if  ( (status  = p7_ProfileConfig_fs_New(hmm, bg, gcode, gm_fs3, EvL, p7_LOCAL)) != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure profile");
       if  ( (status  = p7_fs_oprofile_Convert(gm_fs3, om_fs3))                     != eslOK) ESL_XFAIL(status,  errbuf, "failed to configure oprofile");
     }
     if ((status = p7_fs_Tau_3codons (r, om_fs3, ct, bg, EfL, EfN, lambda, Eft, &tau_fs3)) != eslOK) ESL_XFAIL(status, errbuf, "failed to determine fwd frameshifted tau");
@@ -746,9 +746,7 @@ p7_fs_Tau_5codons(ESL_RANDOMNESS *r, P7_OPROFILE *om_fs, P7_FS_OPROFILE *om_fs5,
         j+=3;
       }
 
-	  if ((status = p7_ForwardParser_Frameshift_5Codons_New(dna_dsq, L*3, om_fs, ox, &fsc)) == eslERANGE) { i--; continue; }
-      
-      //if ((status = p7_ForwardParser_Frameshift_5Codons(dna_dsq, L*3, om_fs5, ox, &fsc)) == eslERANGE) { i--; continue; }
+      if ((status = p7_ForwardParser_Frameshift_5Codons(dna_dsq, L*3, om_fs5, ox, &fsc)) == eslERANGE) { i--; continue; }
       
       if (status != eslOK) goto ERROR;
        
@@ -908,12 +906,12 @@ main(int argc, char **argv)
  
         om_fs5 = p7_fs_oprofile_Create(hmm->M, abc, p7P_5CODONS);
         gm_fs5 = p7_profile_fs_Create(hmm->M, abc, p7P_5CODONS);
-        p7_ProfileConfig_fs(hmm, bg, gcode, gm_fs5, EfL, p7_LOCAL);
+        p7_ProfileConfig_fs_New(hmm, bg, gcode, gm_fs5, EfL, p7_LOCAL);
         p7_fs_oprofile_Convert(gm_fs5, om_fs5);
 
         om_fs3 = p7_fs_oprofile_Create(hmm->M, abc, p7P_3CODONS);
         gm_fs3 = p7_profile_fs_Create(hmm->M, abc, p7P_3CODONS);
-        p7_ProfileConfig_fs(hmm, bg, gcode, gm_fs3, EfL, p7_LOCAL);
+        p7_ProfileConfig_fs_New(hmm, bg, gcode, gm_fs3, EfL, p7_LOCAL);
         p7_fs_oprofile_Convert(gm_fs3, om_fs3); 
       }
       

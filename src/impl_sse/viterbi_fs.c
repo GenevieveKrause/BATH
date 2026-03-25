@@ -1012,7 +1012,7 @@ main(int argc, char **argv)
   p7_bg_SetLength(bgDNA, L);
 
   gm_fs5 = p7_profile_fs_Create(hmm->M, abcAA, p7P_5CODONS);
-  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs5, L/3, p7_UNILOCAL);
+  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs5, L/3, p7_UNILOCAL);
 
   om_fs5 = p7_fs_oprofile_Create(hmm->M, abcAA, p7P_5CODONS);
   p7_fs_oprofile_Convert(gm_fs5, om_fs5);
@@ -1134,7 +1134,7 @@ utest_viterbi_fs(ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA, ESL_ALPHABET *abcDNA,
 
   p7_hmm_Sample(r, M, abcAA, &hmm);
   p7_ProfileConfig(hmm, bgAA, gm, NULL, M, p7_LOCAL, FALSE, FALSE);
-  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs5, M, p7_LOCAL);
+  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs5, M, p7_LOCAL);
   p7_fs_oprofile_Convert(gm_fs5, om_fs5);
 
   while (N--)

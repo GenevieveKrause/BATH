@@ -672,7 +672,7 @@ main(int argc, char **argv)
   bgDNA  = p7_bg_Create(abcDNA);                p7_bg_SetLength(bgDNA, L);
 
   gm_fs5 = p7_profile_fs_Create(hmm->M, abcAA, p7P_5CODONS);
-  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs5, L/3, p7_UNILOCAL);
+  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs5, L/3, p7_UNILOCAL);
 
   om_fs5 = p7_fs_oprofile_Create(hmm->M, abcAA, p7P_5CODONS);
   p7_fs_oprofile_Convert(gm_fs5, om_fs5);
@@ -781,7 +781,7 @@ utest_optacc_fs(ESL_GETOPTS *go, ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA,
   if (p7_hmm_Sample(r, M, abcAA, &hmm)                              != eslOK) esl_fatal(msg);
 
   gm_fs = p7_profile_fs_Create(hmm->M, abcAA, p7P_5CODONS);
-  if (p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_fs, L, p7_UNILOCAL) != eslOK) esl_fatal(msg);
+  if (p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_fs, L, p7_UNILOCAL) != eslOK) esl_fatal(msg);
 
   om_fs = p7_fs_oprofile_Create(hmm->M, abcAA, p7P_5CODONS);
   if (p7_fs_oprofile_Convert(gm_fs, om_fs)                          != eslOK) esl_fatal(msg);

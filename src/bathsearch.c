@@ -813,8 +813,8 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
     
 	p7_oprofile_Convert(gm_fs, om_fs);
 
-    p7_ProfileConfig_fs(hmm, info->bg, gcode, gm_fs5, 100, p7_LOCAL);  /* build framshift aware codon HMM */
-    p7_ProfileConfig_fs(hmm, info->bg, gcode, gm_fs3, 100, p7_LOCAL);
+    p7_ProfileConfig_fs_New(hmm, info->bg, gcode, gm_fs5, 100, p7_LOCAL);  /* build framshift aware codon HMM */
+    p7_ProfileConfig_fs_New(hmm, info->bg, gcode, gm_fs3, 100, p7_LOCAL);
     
     p7_fs_oprofile_Convert(gm_fs3, om_fs3);  
     p7_fs_oprofile_Convert(gm_fs5, om_fs5);
@@ -950,7 +950,7 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
       esl_stopwatch_Start(splice_watch);
 
       gm_tr = p7_profile_fs_Create (hmm->M, abcAA, 1); 
-      p7_ProfileConfig_fs(hmm, info->bg, gcode, gm_tr, 100, p7_UNILOCAL); 
+      p7_ProfileConfig_fs_New(hmm, info->bg, gcode, gm_tr, 100, p7_UNILOCAL); 
 
 	  p7_tophits_SortBySeqidxAndAlipos(tophits_accumulator);
       p7_hmmwindow_RemoveDuplicates(seed_accumulator, tophits_accumulator, pipelinehits_accumulator->F3); 

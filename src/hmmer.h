@@ -340,7 +340,7 @@ enum p7p_ivx_codon {
 #define p7P_MSC_AMINO3(gm, k ,x)  ((gm)->rsc[p7P_MAXCODONS3 + (x)][(k)])
 #define p7P_MSC_AMINO1(gm, k ,x)  ((gm)->rsc[p7P_MAXCODONS1 + (x)][(k)])
 
-#define p7P_FSPROB                0.02
+#define p7P_FSPROB                0.01
 
 typedef struct p7_profile_s {
   float  *tsc;                            /* transitions  [0.1..M-1][0..p7P_NTRANS-1], hand-indexed  */
@@ -1378,7 +1378,7 @@ extern int   p7_ILogsum(int s1, int s2);
 
 /* modelconfig.c */
 extern int p7_ProfileConfig(const P7_HMM *hmm, const P7_BG *bg, P7_PROFILE *gm, const ESL_GENCODE *gcode, int L, int mode, int fs, int stops);
-extern int p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode, P7_FS_PROFILE *gm_fs, int L_amino, int mode);
+//extern int p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode, P7_FS_PROFILE *gm_fs, int L_amino, int mode);
 extern int p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode, P7_FS_PROFILE *gm_fs, int L_amino, int mode);
 extern int p7_ReconfigLength  (P7_PROFILE *gm, int L);
 extern int p7_fs_ReconfigLength  (P7_FS_PROFILE *gm_fs, int L_amino);
@@ -1746,7 +1746,6 @@ extern int  p7_trace_fs_Append(P7_TRACE *tr, char st, int k, int i, int c);
 extern int  p7_trace_AppendWithPP(P7_TRACE *tr, char st, int k, int i, float pp);
 extern int  p7_trace_fs_AppendWithPP(P7_TRACE *tr, char st, int k, int i, int c, float pp);
 extern int  p7_trace_splice_AppendWithPP(P7_TRACE *tr, char st, int k, int i, int c, int sp, float pp);
-extern int  p7_trace_fs_AppendWithPP_New2(P7_TRACE *tr, char st, int k, int i, int c, float pp);
 extern int  p7_trace_Reverse(P7_TRACE *tr);
 extern int  p7_trace_fs_Reverse(P7_TRACE *tr);
 extern int  p7_trace_Index(P7_TRACE *tr);

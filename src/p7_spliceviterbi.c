@@ -1425,7 +1425,7 @@ main(int argc, char **argv)
   gcode  = esl_gencode_Create(abcDNA, abcAA);
   bgAA   = p7_bg_Create(abcAA);
   gm_tr  = p7_profile_fs_Create(hmm->M, abcAA, 1);
-  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_tr, L / 3, p7_UNILOCAL);
+  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_tr, L / 3, p7_UNILOCAL);
   p7_fs_ReconfigLength(gm_tr, L / 3);
 
   pli = p7_splicepipeline_Create(NULL, hmm->M, L);
@@ -1518,7 +1518,7 @@ utest_viterbi(ESL_RANDOMNESS *r, ESL_ALPHABET *abcAA, ESL_ALPHABET *abcDNA,
 
   p7_hmm_Sample(r, M, abcAA, &hmm);
   p7_ProfileConfig   (hmm, bgAA, gm, NULL, M, p7_LOCAL, FALSE, FALSE);
-  p7_ProfileConfig_fs(hmm, bgAA, gcode, gm_tr, M, p7_UNILOCAL);
+  p7_ProfileConfig_fs_New(hmm, bgAA, gcode, gm_tr, M, p7_UNILOCAL);
 
   pli = p7_splicepipeline_Create(NULL, M, M * 3);
 

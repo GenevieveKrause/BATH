@@ -1019,9 +1019,8 @@ rescore_isolated_domain_frameshift(P7_DOMAINDEF *ddef, P7_PIPELINE *pli, P7_OPRO
   p7_fs_oprofile_ReconfigLength(om_fs5, Ld/3);
   p7_omx_GrowTo_dpf(ox1, om_fs5->M, Ld, Ld);
   p7_oprofile_ReconfigLength(om_fs, Ld);
-  if ((status = p7_Forward_Frameshift_New(windowsq->dsq+i-1, Ld, om_fs, ox1, &envsc)) == eslERANGE) return eslOK;
 
-  //if ((status = p7_Forward_Frameshift(windowsq->dsq+i-1, Ld, om_fs5, ox1, &envsc)) == eslERANGE) return eslOK;
+  if ((status = p7_Forward_Frameshift(windowsq->dsq+i-1, Ld, om_fs5, ox1, &envsc)) == eslERANGE) return eslOK;
   if (status != eslOK) ESL_XEXCEPTION(status, "forward frameshift failed");
 
   seqscore = (envsc-filtersc) / eslCONST_LOG2; 
@@ -1040,8 +1039,8 @@ rescore_isolated_domain_frameshift(P7_DOMAINDEF *ddef, P7_PIPELINE *pli, P7_OPRO
 
   /* Backward */
   p7_omx_GrowTo_dpf(ox2, om_fs5->M, Ld, Ld);
-  if ((status = p7_Backward_Frameshift_New(windowsq->dsq+i-1, Ld, om_fs, ox1, ox2, NULL)) == eslERANGE) return eslOK;
-  //if ((status = p7_Backward_Frameshift(windowsq->dsq+i-1, Ld, om_fs5, ox1, ox2, NULL)) == eslERANGE) return eslOK;
+
+  if ((status = p7_Backward_Frameshift(windowsq->dsq+i-1, Ld, om_fs5, ox1, ox2, NULL)) == eslERANGE) return eslOK;
   if (status != eslOK) ESL_XEXCEPTION(status, "backward frameshift failed");
 
   /* Posterior Probabilities */
