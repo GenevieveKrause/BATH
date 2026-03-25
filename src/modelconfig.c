@@ -705,6 +705,376 @@ p7_ProfileConfig_fs(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode
 }
 
 
+/* Function:  p7_ProfileConfig_fs_New()
+ * Synopsis:  Configure a frameshift-aware search profile (averaged quasi-codon scoring).
+ *
+ * Purpose:   Same as p7_ProfileConfig_fs() but uses a log-sum-exp average over all
+ *            candidate codon interpretations rather than taking the maximum.  This
+ *            removes the bias that caused quasi-codons to be over-represented at HMM
+ *            columns whose consensus amino acid has a low background frequency.
+ *
+ *            Scoring is performed in three layers:
+ *              1. Sense codons   : log(mat[k][a] / bg->f[a]) + no_indel
+ *              2. Stop codons    : logsumexp over non-stop single-substitution
+ *                                  neighbours (raw amino acid log-odds) - log(N)
+ *                                  + stop_codon penalty
+ *              3. Quasi-codons   : logsumexp over the relevant Layer-1/2 3-nt codon
+ *                                  scores - log(N_candidates) + indel_penalty
+ *
+ * Returns:   <eslOK> on success.
+ * Throws:    <eslEMEM> on allocation error.
+ */
+int
+p7_ProfileConfig_fs_New(const P7_HMM *hmm, const P7_BG *bg, const ESL_GENCODE *gcode, P7_FS_PROFILE *gm_fs, int L_amino, int mode)
+{
+  int     k, t, u, v, w, x, z;
+  int     a;
+  int     subn, suba;
+  int     codon;
+  int     status;
+  int     codon_idx;
+  int     maxcodons;
+  int     n;           /* count of non-stop substitution neighbours for stop scoring */
+  float   lse;         /* logsumexp accumulator                                      */
+  float  *occ = NULL;
+  float  *tp;
+  float   sc[p7_MAXCODE];
+  float   Z;
+  float   one_indel  = 0.f;
+  float   two_indel  = 0.f;
+  float   no_indel   = 0.f;
+  float   stop_codon = 0.f;
+  int     stop       = hmm->abc->Kp - 2;
+
+  /* Contract checks */
+  if (gm_fs->abc->type != hmm->abc->type) ESL_XEXCEPTION(eslEINVAL, "HMM and profile alphabet don't match");
+  if (hmm->M > gm_fs->allocM)             ESL_XEXCEPTION(eslEINVAL, "profile too small to hold HMM");
+  if (! (hmm->flags & p7H_CONS))          ESL_XEXCEPTION(eslEINVAL, "HMM must have a consensus to transfer to the profile");
+
+  if (gm_fs->codon_lengths == 5) {
+    maxcodons  = p7P_MAXCODONS5;
+    one_indel  = log(hmm->fsprob);
+    two_indel  = log(hmm->fsprob / 2.);
+    stop_codon = log(hmm->fsprob);
+    no_indel   = log(1.- hmm->fsprob * 4.);
+  } else if (gm_fs->codon_lengths == 3) {
+    maxcodons  = p7P_MAXCODONS3;
+    one_indel  = log(hmm->fsprob);
+    stop_codon = log(hmm->fsprob);
+    no_indel   = log(1. - hmm->fsprob * 3.);
+  } else if (gm_fs->codon_lengths == 1) {
+    maxcodons = p7P_MAXCODONS1;
+  } else {
+    ESL_XEXCEPTION(eslEINVAL, "invalid codon_lengths; must be 1, 3 or 5");
+  }
+
+  /* Copy some pointer references and other info across from HMM  */
+  gm_fs->M                = hmm->M;
+  gm_fs->max_length       = hmm->max_length;
+  gm_fs->mode             = mode;
+  gm_fs->roff             = -1;
+  gm_fs->eoff             = -1;
+  gm_fs->offs[p7_MOFFSET] = -1;
+  gm_fs->offs[p7_FOFFSET] = -1;
+  gm_fs->offs[p7_POFFSET] = -1;
+  if (gm_fs->name != NULL) free(gm_fs->name);
+  if (gm_fs->acc  != NULL) free(gm_fs->acc);
+  if (gm_fs->desc != NULL) free(gm_fs->desc);
+  if ((status = esl_strdup(hmm->name, -1, &(gm_fs->name))) != eslOK) goto ERROR;
+  if ((status = esl_strdup(hmm->acc,  -1, &(gm_fs->acc)))  != eslOK) goto ERROR;
+  if ((status = esl_strdup(hmm->desc, -1, &(gm_fs->desc))) != eslOK) goto ERROR;
+  if (hmm->flags & p7H_RF)    strcpy(gm_fs->rf,        hmm->rf);
+  if (hmm->flags & p7H_MMASK) strcpy(gm_fs->mm,        hmm->mm);
+  if (hmm->flags & p7H_CONS)  strcpy(gm_fs->consensus, hmm->consensus);
+  if (hmm->flags & p7H_CS)    strcpy(gm_fs->cs,        hmm->cs);
+  for (z = 0; z < p7_NEVPARAM; z++) gm_fs->evparam[z] = hmm->evparam[z];
+  for (z = 0; z < p7_NCUTOFFS; z++) gm_fs->cutoff[z]  = hmm->cutoff[z];
+  for (z = 0; z < p7_MAXABET;  z++) gm_fs->compo[z]   = hmm->compo[z];
+
+  /* Entry scores. */
+  if (p7_fs_profile_IsLocal(gm_fs)) {
+    Z = 0.;
+    ESL_ALLOC(occ, sizeof(float) * (hmm->M+1));
+    if ((status = p7_hmm_CalculateOccupancy(hmm, occ, NULL)) != eslOK) goto ERROR;
+    for (k = 1; k <= hmm->M; k++)
+      Z += occ[k] * (float) (hmm->M-k+1);
+    for (k = 1; k <= hmm->M; k++)
+      p7P_TSC(gm_fs, k-1, p7P_BM) = log(occ[k] / Z);
+    free(occ);
+  } else {
+    Z = log(hmm->t[0][p7H_MD]);
+    p7P_TSC(gm_fs, 0, p7P_BM) = log(1.0 - hmm->t[0][p7H_MD]);
+    for (k = 1; k < hmm->M; k++) {
+      p7P_TSC(gm_fs, k, p7P_BM) = Z + log(hmm->t[k][p7H_DM]);
+      Z += log(hmm->t[k][p7H_DD]);
+    }
+  }
+
+  /* E state loop/move probabilities */
+  if (p7_fs_profile_IsMultihit(gm_fs)) {
+    gm_fs->xsc[p7P_E][p7P_MOVE] = -eslCONST_LOG2;
+    gm_fs->xsc[p7P_E][p7P_LOOP] = -eslCONST_LOG2;
+    gm_fs->nj                   = 1.0f;
+  } else {
+    gm_fs->xsc[p7P_E][p7P_MOVE] = 0.0f;
+    gm_fs->xsc[p7P_E][p7P_LOOP] = -eslINFINITY;
+    gm_fs->nj                   = 0.0f;
+  }
+
+  /* Transition scores. */
+  for (k = 1; k < gm_fs->M; k++) {
+    tp = gm_fs->tsc + k * p7P_NTRANS;
+    tp[p7P_MM] = log(hmm->t[k][p7H_MM]);
+    tp[p7P_MI] = log(hmm->t[k][p7H_MI]);
+    tp[p7P_MD] = log(hmm->t[k][p7H_MD]);
+    tp[p7P_IM] = log(hmm->t[k][p7H_IM]);
+    tp[p7P_II] = log(hmm->t[k][p7H_II]);
+    tp[p7P_DM] = log(hmm->t[k][p7H_DM]);
+    tp[p7P_DD] = log(hmm->t[k][p7H_DD]);
+  }
+
+  /* Amino acid log-odds scores (same as original). */
+  sc[hmm->abc->K]    = -eslINFINITY; /* gap character    */
+  sc[hmm->abc->Kp-2] = -eslINFINITY; /* STOP character   */
+  sc[hmm->abc->Kp-1] = -eslINFINITY; /* missing data     */
+
+  for (x = 0; x < (maxcodons + gm_fs->abc->Kp); x++)
+    esl_vec_FSet(gm_fs->rsc[x], hmm->M + 1, -eslINFINITY);
+
+  for (k = 1; k <= hmm->M; k++) {
+    for (x = 0; x < hmm->abc->K; x++)
+      sc[x] = log((double)hmm->mat[k][x] / bg->f[x]);
+    esl_abc_FExpectScVec(hmm->abc, sc, bg->f);
+    for (x = 0; x < hmm->abc->Kp; x++)
+      gm_fs->rsc[maxcodons + x][k] = sc[x];
+  }
+
+  /* ---------------------------------------------------------------
+   * Emission scores: three-layer averaged scoring scheme.
+   * Layer 1 (3-nt sense codons) must be complete before Layer 2
+   * (stop codons) is computed; both must be complete before Layer 3
+   * (quasi-codons) is computed.
+   * --------------------------------------------------------------- */
+
+  if (gm_fs->codon_lengths == 5) {
+
+    /* --- Layer 1: sense 3-nt codons --- */
+    for (k = 1; k <= hmm->M; k++)
+      for (v = 0; v < 4; v++)
+        for (w = 0; w < 4; w++)
+          for (x = 0; x < 4; x++) {
+            codon = 16*v + 4*w + x;
+            a     = gcode->basic[codon];
+            if (a != stop)
+              p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x)) = p7P_MSC_AMINO5(gm_fs, k, a) + no_indel;
+          }
+
+    /* --- Layer 2: stop 3-nt codons --- */
+    /* Average raw amino acid log-odds over non-stop single-substitution
+     * neighbours; stop-to-stop neighbours are excluded.  Duplicates are
+     * counted (same amino acid reachable via two substitutions counts twice). */
+    for (k = 1; k <= hmm->M; k++)
+      for (v = 0; v < 4; v++)
+        for (w = 0; w < 4; w++)
+          for (x = 0; x < 4; x++) {
+            codon = 16*v + 4*w + x;
+            a     = gcode->basic[codon];
+            if (a != stop) continue;
+            lse = -eslINFINITY;
+            n   = 0;
+            for (subn = 0; subn < 4; subn++) {
+              if (subn != v) { /* substitute position 1 */
+                suba = gcode->basic[16*subn + 4*w + x];
+                if (suba != stop) { lse = p7_FLogsum(lse, p7P_MSC_AMINO5(gm_fs, k, suba)); n++; }
+              }
+              if (subn != w) { /* substitute position 2 */
+                suba = gcode->basic[16*v + 4*subn + x];
+                if (suba != stop) { lse = p7_FLogsum(lse, p7P_MSC_AMINO5(gm_fs, k, suba)); n++; }
+              }
+              if (subn != x) { /* substitute position 3 */
+                suba = gcode->basic[16*v + 4*w + subn];
+                if (suba != stop) { lse = p7_FLogsum(lse, p7P_MSC_AMINO5(gm_fs, k, suba)); n++; }
+              }
+            }
+            p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x)) =
+              (n > 0) ? lse - logf((float)n) + stop_codon : -eslINFINITY;
+          }
+
+    /* --- Layer 3a: 2-nt quasi-codons (one deletion) ---
+     * Observed pair (v,w).  12 candidates: missing nt at position 1, 2, or 3,
+     * each with all 4 possible nucleotide values. */
+    for (k = 1; k <= hmm->M; k++)
+      for (v = 0; v < 4; v++)
+        for (w = 0; w < 4; w++) {
+          lse = -eslINFINITY;
+          for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(x,v,w))); /* _VW */
+          for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,x,w))); /* V_W */
+          for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x))); /* VW_ */
+          p7P_MSC_CODON(gm_fs, k, p7P_CODON2_FS5(v,w)) = lse - logf(12.0f) + one_indel;
+        }
+
+    /* --- Layer 3b: 1-nt quasi-codons (two deletions) ---
+     * Observed single nucleotide x.  32 candidates: __X pattern (16) + X__ pattern (16). */
+    for (k = 1; k <= hmm->M; k++)
+      for (x = 0; x < 4; x++) {
+        lse = -eslINFINITY;
+        for (v = 0; v < 4; v++)
+          for (w = 0; w < 4; w++) {
+            lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x))); /* __X */
+            lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(x,v,w))); /* X__ */
+          }
+        p7P_MSC_CODON(gm_fs, k, p7P_CODON1_FS5(x)) = lse - logf(32.0f) + two_indel;
+      }
+
+    /* --- Layer 3c: 4-nt quasi-codons (one insertion) ---
+     * Observed (u,v,w,x).  3 candidates: treat u, v, or w as the inserted nucleotide. */
+    for (k = 1; k <= hmm->M; k++)
+      for (u = 0; u < 4; u++)
+        for (v = 0; v < 4; v++)
+          for (w = 0; w < 4; w++)
+            for (x = 0; x < 4; x++) {
+              lse = p7_FLogsum(p7_FLogsum(
+                      p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(u,v,x)),  /* XXxX: w inserted */
+                      p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(u,w,x))), /* XxXX: v inserted */
+                      p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x))); /* xXXX: u inserted */
+              p7P_MSC_CODON(gm_fs, k, p7P_CODON4_FS5(u,v,w,x)) = lse - logf(3.0f) + one_indel;
+            }
+
+    /* --- Layer 3d: 5-nt quasi-codons (two insertions) ---
+     * Observed (t,u,v,w,x).  3 candidates: treat (v,w), (u,w), or (t,u) as inserted. */
+    for (k = 1; k <= hmm->M; k++)
+      for (t = 0; t < 4; t++)
+        for (u = 0; u < 4; u++)
+          for (v = 0; v < 4; v++)
+            for (w = 0; w < 4; w++)
+              for (x = 0; x < 4; x++) {
+                lse = p7_FLogsum(p7_FLogsum(
+                        p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(t,u,x)),  /* XXxxX: v,w inserted */
+                        p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(t,w,x))), /* XxxXX: u,v inserted */
+                        p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS5(v,w,x))); /* xxXXX: t,u inserted */
+                p7P_MSC_CODON(gm_fs, k, p7P_CODON5_FS5(t,u,v,w,x)) = lse - logf(3.0f) + two_indel;
+              }
+
+    /* Degenerate nucleotide placeholders */
+    a = hmm->abc->Kp-3;
+    for (k = 1; k <= hmm->M; k++) {
+      codon_idx = p7P_DEGEN5_C;
+      p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a) + no_indel;
+
+      codon_idx = p7P_DEGEN5_QC1;
+      p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a) + one_indel;
+
+      codon_idx = p7P_DEGEN5_QC2;
+      p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO5(gm_fs, k, a) + two_indel;
+    }
+  }
+  else if (gm_fs->codon_lengths == 3) {
+
+    /* --- Layer 1: sense 3-nt codons --- */
+    for (k = 1; k <= hmm->M; k++)
+      for (v = 0; v < 4; v++)
+        for (w = 0; w < 4; w++)
+          for (x = 0; x < 4; x++) {
+            codon = 16*v + 4*w + x;
+            a     = gcode->basic[codon];
+            if (a != stop)
+              p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(v,w,x)) = p7P_MSC_AMINO3(gm_fs, k, a) + no_indel;
+          }
+
+    /* --- Layer 2: stop 3-nt codons --- */
+    for (k = 1; k <= hmm->M; k++)
+      for (v = 0; v < 4; v++)
+        for (w = 0; w < 4; w++)
+          for (x = 0; x < 4; x++) {
+            codon = 16*v + 4*w + x;
+            a     = gcode->basic[codon];
+            if (a != stop) continue;
+            lse = -eslINFINITY;
+            n   = 0;
+            for (subn = 0; subn < 4; subn++) {
+              if (subn != v) {
+                suba = gcode->basic[16*subn + 4*w + x];
+                if (suba != stop) { lse = p7_FLogsum(lse, p7P_MSC_AMINO3(gm_fs, k, suba)); n++; }
+              }
+              if (subn != w) {
+                suba = gcode->basic[16*v + 4*subn + x];
+                if (suba != stop) { lse = p7_FLogsum(lse, p7P_MSC_AMINO3(gm_fs, k, suba)); n++; }
+              }
+              if (subn != x) {
+                suba = gcode->basic[16*v + 4*w + subn];
+                if (suba != stop) { lse = p7_FLogsum(lse, p7P_MSC_AMINO3(gm_fs, k, suba)); n++; }
+              }
+            }
+            p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(v,w,x)) =
+              (n > 0) ? lse - logf((float)n) + stop_codon : -eslINFINITY;
+          }
+
+    /* --- Layer 3a: 2-nt quasi-codons (one deletion) ---
+     * Observed pair (v,w).  12 candidates: missing nt at position 1, 2, or 3. */
+    for (k = 1; k <= hmm->M; k++)
+      for (v = 0; v < 4; v++)
+        for (w = 0; w < 4; w++) {
+          lse = -eslINFINITY;
+          for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(x,v,w))); /* _VW */
+          for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(v,x,w))); /* V_W */
+          for (x = 0; x < 4; x++) lse = p7_FLogsum(lse, p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(v,w,x))); /* VW_ */
+          p7P_MSC_CODON(gm_fs, k, p7P_CODON2_FS3(v,w)) = lse - logf(12.0f) + one_indel;
+        }
+
+    /* --- Layer 3b: 4-nt quasi-codons (one insertion) ---
+     * Observed (u,v,w,x).  3 candidates: treat u, v, or w as the inserted nucleotide. */
+    for (k = 1; k <= hmm->M; k++)
+      for (u = 0; u < 4; u++)
+        for (v = 0; v < 4; v++)
+          for (w = 0; w < 4; w++)
+            for (x = 0; x < 4; x++) {
+              lse = p7_FLogsum(p7_FLogsum(
+                      p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(u,v,x)),  /* XXxX: w inserted */
+                      p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(u,w,x))), /* XxXX: v inserted */
+                      p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS3(v,w,x))); /* xXXX: u inserted */
+              p7P_MSC_CODON(gm_fs, k, p7P_CODON4_FS3(u,v,w,x)) = lse - logf(3.0f) + one_indel;
+            }
+
+    /* Degenerate nucleotide placeholders */
+    a = hmm->abc->Kp-3;
+    for (k = 1; k <= hmm->M; k++) {
+      codon_idx = p7P_DEGEN3_C;
+      p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO3(gm_fs, k, a) + no_indel;
+
+      codon_idx = p7P_DEGEN3_QC1;
+      p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO3(gm_fs, k, a) + one_indel;
+    }
+  }
+  else if (gm_fs->codon_lengths == 1) {
+    /* No frameshifts; scoring is identical to original. */
+    for (k = 1; k <= hmm->M; k++)
+      for (v = 0; v < 4; v++)
+        for (w = 0; w < 4; w++)
+          for (x = 0; x < 4; x++) {
+            codon = 16*v + 4*w + x;
+            a     = gcode->basic[codon];
+            p7P_MSC_CODON(gm_fs, k, p7P_CODON3_FS1(v,w,x)) = p7P_MSC_AMINO1(gm_fs, k, a);
+          }
+    a = hmm->abc->Kp-3;
+    for (k = 1; k <= hmm->M; k++) {
+      codon_idx = p7P_DEGEN1_C;
+      p7P_MSC_CODON(gm_fs, k, codon_idx) = p7P_MSC_AMINO1(gm_fs, k, a);
+    }
+  }
+
+  gm_fs->fs     = hmm->fs;
+  gm_fs->fsprob = hmm->fsprob;
+
+  gm_fs->L = 0;
+  if ((status = p7_fs_ReconfigLength(gm_fs, L_amino)) != eslOK) goto ERROR;
+  return eslOK;
+
+ ERROR:
+  if (occ != NULL) free(occ);
+  return status;
+}
+
+
 /* Function:  p7_ReconfigLength()
  * Synopsis:  Set the target sequence length of a model.
  *
