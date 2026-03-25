@@ -545,6 +545,412 @@ p7_ForwardParser_Frameshift_3Codons(const ESL_DSQ *dsq, int L, const P7_FS_OPROF
 }
 
 
+/* Function:  p7_ForwardParser_Frameshift_3Codons_New
+ * Synopsis:  SSE Forward parser with new P7_PROFILE-based codon scoring, 3 codon lengths, linear memory.
+ *
+ * Purpose:   As p7_ForwardParser_Frameshift_3Codons(), but uses the new codon
+ *            scoring approach: C3 (in-frame 3-nt codon) is scored via standard
+ *            AA match emissions from <om->rfv> times a real-codon probability
+ *            constant; C2/C4 quasi-codons use only a flat frameshift probability
+ *            constant (no nucleotide emission term).
+ *
+ * Args:      dsq    - nucleotide sequence in digitized form, 1..L
+ *            L      - length of dsq
+ *            om     - optimized profile (must have om->codons, om->fsprob set)
+ *            ox     - DP matrix with PARSER_ROWS_FWD MDI rows and L X rows
+ *            opt_sc - optRETURN: Forward score in nats
+ *
+ * Returns:   <eslOK> on success.
+ * Throws:    <eslERANGE> if score overflows or underflows.
+ */
+int
+p7_ForwardParser_Frameshift_3Codons_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, P7_OMX *ox, float *opt_sc)
+{
+  register __m128 mpv2, dpv2, ipv2;
+  register __m128 sv;
+  register __m128 msv;
+  register __m128 dcv;
+  register __m128 xEv;
+  register __m128 xBv2;
+  __m128   zerov;
+  float    xN, xE, xB, xC, xJ;
+  float    xN_buf[PARSER_ROWS_FWD];
+  float    xB_buf[PARSER_ROWS_FWD];
+  float    xJ_buf[PARSER_ROWS_FWD];
+  float    xC_buf[PARSER_ROWS_FWD];
+  int      b, b2, b3;
+  int      curr, prev2, prev3;
+  int      ivx_2, ivx_3, ivx_4;
+  __m128  *dpc, *dpp2, *dpp3;
+  __m128  *tp;
+  __m128  *ivxf     = NULL;
+  __m128  *ivxf_mem = NULL;
+  int      Q = p7O_NQF(om->M);
+  int      i, q, j, r;
+  int      v, w, x;
+  int      codon, aa;
+  int      status;
+
+  /* Frameshift probability constants (probability space).
+   * C2/C4 quasi-codons share a flat penalty; only C3 (in-frame 3-nt codon)
+   * uses the complementary real_codon weight with AA emission. */
+  __m128  quasi_codon_v = _mm_set1_ps(om->fsprob);
+  __m128  real_codon_v  = _mm_set1_ps(1.0f - om->fsprob * 4.0f);
+
+  ox->M              = om->M;
+  ox->L              = L;
+  ox->has_own_scales = TRUE;
+  ox->totscale       = 0.0;
+  zerov = _mm_setzero_ps();
+
+  ESL_ALLOC(ivxf_mem, sizeof(__m128) * p7P_3CODONS * Q + 15);
+  ivxf = (__m128 *) (((unsigned long int) ivxf_mem + 15) & (~0xf));
+
+  for (r = 0; r < PARSER_ROWS_FWD; r++)
+    for (q = 0; q < Q; q++)
+      MMO(ox->dpf[r],q) = IMO(ox->dpf[r],q) = DMO(ox->dpf[r],q) = zerov;
+
+  for (r = 0; r < p7P_3CODONS; r++)
+    for (q = 0; q < Q; q++)
+      IVX(r, q) = zerov;
+
+  for (r = 0; r < PARSER_ROWS_FWD; r++)
+    xN_buf[r] = xB_buf[r] = xJ_buf[r] = xC_buf[r] = 0.0f;
+  xN_buf[0] = xN_buf[1] = 1.0f;
+  xB_buf[0] = xB_buf[1] = om->xf[p7O_N][p7O_MOVE];
+
+  ox->xmx[p7X_SCALE] = 1.0;
+  ox->xmx[p7X_E]     = 0.0;
+  ox->xmx[p7X_N]     = 1.0;
+  ox->xmx[p7X_J]     = 0.0;
+  ox->xmx[p7X_B]     = om->xf[p7O_N][p7O_MOVE];
+  ox->xmx[p7X_C]     = 0.0;
+  ox->xmx[1*p7X_NXCELLS+p7X_SCALE] = 1.0;
+  ox->xmx[1*p7X_NXCELLS+p7X_E]     = 0.0;
+  ox->xmx[1*p7X_NXCELLS+p7X_N]     = 1.0;
+  ox->xmx[1*p7X_NXCELLS+p7X_J]     = 0.0;
+  ox->xmx[1*p7X_NXCELLS+p7X_B]     = om->xf[p7O_N][p7O_MOVE];
+  ox->xmx[1*p7X_NXCELLS+p7X_C]     = 0.0;
+
+  /* Initialize nucleotide rolling window.
+   * v = sentinel (position before sequence start).
+   * w = dsq[1], x = dsq[2] for the i=2 initialization.
+   */
+  v = p7P_MAXNUC;
+  if (dsq[1] < p7P_MAXNUC) w = dsq[1]; else w = p7P_MAXNUC;
+  if (dsq[2] < p7P_MAXNUC) x = dsq[2]; else x = p7P_MAXNUC;
+
+  /*----------------------------------------------------------------
+   * Initialization: i=2
+   * Only the length-2 quasi-codon (C2) contributes; scored with
+   * quasi_codon_v (no nucleotide emission term).
+   * IVX(ivx_2) comes from B(0)*BM; IVX(ivx_3), IVX(ivx_4) are zero.
+   *----------------------------------------------------------------*/
+  i = 2;
+
+  curr  = 2;
+  prev2 = 0;
+  prev3 = 3;
+  ivx_2 = 2;
+  ivx_3 = 1;
+  ivx_4 = 0;
+
+  dpc  = ox->dpf[curr];
+  dpp2 = ox->dpf[prev2];
+  dpp3 = ox->dpf[prev3];
+
+  xBv2 = _mm_set1_ps(xB_buf[0]);
+  tp   = om->tfv;
+  dcv  = zerov;
+  xEv  = zerov;
+  mpv2 = dpv2 = ipv2 = zerov;
+
+  for (q = 0; q < Q; q++)
+    {
+      sv  =                _mm_mul_ps(xBv2, *tp); tp++;
+      sv  = _mm_add_ps(sv, _mm_mul_ps(mpv2, *tp)); tp++;
+      sv  = _mm_add_ps(sv, _mm_mul_ps(ipv2, *tp)); tp++;
+      sv  = _mm_add_ps(sv, _mm_mul_ps(dpv2, *tp)); tp++;
+      IVX(ivx_2, q) = sv;
+
+      msv = _mm_mul_ps(sv, quasi_codon_v);   /* C2: quasi-codon penalty only */
+      xEv = _mm_add_ps(xEv, msv);
+
+      MMO(dpc, q) = msv;
+      DMO(dpc, q) = dcv;
+      dcv = _mm_mul_ps(msv, *tp); tp++;
+
+      IMO(dpc, q) = zerov;
+      tp += 2;
+    }
+
+  dcv        = esl_sse_rightshiftz_float(dcv);
+  DMO(dpc,0) = zerov;
+  tp         = om->tfv + 7*Q;
+  for (q = 0; q < Q; q++)
+    {
+      DMO(dpc, q) = _mm_add_ps(dcv, DMO(dpc, q));
+      dcv         = _mm_mul_ps(DMO(dpc, q), *tp); tp++;
+    }
+  if (om->M < 100)
+    {
+      for (j = 1; j < 4; j++)
+        {
+          dcv = esl_sse_rightshiftz_float(dcv);
+          tp  = om->tfv + 7*Q;
+          for (q = 0; q < Q; q++)
+            {
+              DMO(dpc, q) = _mm_add_ps(dcv, DMO(dpc, q));
+              dcv         = _mm_mul_ps(dcv, *tp); tp++;
+            }
+        }
+    }
+  else
+    {
+      for (j = 1; j < 4; j++)
+        {
+          register __m128 cv;
+          dcv = esl_sse_rightshiftz_float(dcv);
+          tp  = om->tfv + 7*Q;
+          cv  = zerov;
+          for (q = 0; q < Q; q++)
+            {
+              sv          = _mm_add_ps(dcv, DMO(dpc, q));
+              cv          = _mm_or_ps(cv, _mm_cmpgt_ps(sv, DMO(dpc, q)));
+              DMO(dpc, q) = sv;
+              dcv         = _mm_mul_ps(dcv, *tp); tp++;
+            }
+          if (! _mm_movemask_ps(cv)) break;
+        }
+    }
+
+  for (q = 0; q < Q; q++) xEv = _mm_add_ps(DMO(dpc, q), xEv);
+  xEv = _mm_add_ps(xEv, _mm_shuffle_ps(xEv, xEv, _MM_SHUFFLE(0, 3, 2, 1)));
+  xEv = _mm_add_ps(xEv, _mm_shuffle_ps(xEv, xEv, _MM_SHUFFLE(1, 0, 3, 2)));
+  _mm_store_ss(&xE, xEv);
+
+  xN = 1.0f;
+  xJ = xE * om->xf[p7O_E][p7O_LOOP];
+  xC = xE * om->xf[p7O_E][p7O_MOVE];
+  xB = xN * om->xf[p7O_N][p7O_MOVE] + xJ * om->xf[p7O_J][p7O_MOVE];
+
+  if (xE > 1.0e4f)
+    {
+      float scale_factor = 1.0f / xE;
+      xN *= scale_factor; xJ *= scale_factor; xC *= scale_factor; xB *= scale_factor;
+      xEv = _mm_set1_ps(scale_factor);
+      for (r = 0; r < PARSER_ROWS_FWD; r++)
+        for (q = 0; q < Q; q++)
+          {
+            MMO(ox->dpf[r], q) = _mm_mul_ps(MMO(ox->dpf[r], q), xEv);
+            DMO(ox->dpf[r], q) = _mm_mul_ps(DMO(ox->dpf[r], q), xEv);
+            IMO(ox->dpf[r], q) = _mm_mul_ps(IMO(ox->dpf[r], q), xEv);
+          }
+      for (r = 0; r < p7P_3CODONS; r++)
+        for (q = 0; q < Q; q++)
+          IVX(r, q) = _mm_mul_ps(IVX(r, q), xEv);
+      for (r = 0; r < PARSER_ROWS_FWD; r++)
+        {
+          xN_buf[r] *= scale_factor; xB_buf[r] *= scale_factor;
+          xJ_buf[r] *= scale_factor; xC_buf[r] *= scale_factor;
+        }
+      ox->xmx[2*p7X_NXCELLS+p7X_SCALE] = xE;
+      ox->totscale += log(xE);
+      xE = 1.0f;
+    }
+  else ox->xmx[2*p7X_NXCELLS+p7X_SCALE] = 1.0f;
+
+  xN_buf[2] = xN; xB_buf[2] = xB; xJ_buf[2] = xJ; xC_buf[2] = xC;
+  ox->xmx[2*p7X_NXCELLS+p7X_E] = xE;
+  ox->xmx[2*p7X_NXCELLS+p7X_N] = xN;
+  ox->xmx[2*p7X_NXCELLS+p7X_J] = xJ;
+  ox->xmx[2*p7X_NXCELLS+p7X_B] = xB;
+  ox->xmx[2*p7X_NXCELLS+p7X_C] = xC;
+
+  /*----------------------------------------------------------------
+   * Main recurrence: i = 3..L
+   *
+   * M(i,k) = IVX(ivx_2,k) * quasi_codon_v                              [C2: 2-nt quasi-codon]
+   *         + IVX(ivx_3,k) * rfv[aa][k] * real_codon_v                 [C3: 3-nt real codon]
+   *         + IVX(ivx_4,k) * quasi_codon_v                              [C4: 4-nt quasi-codon]
+   *
+   * IVX(ivx_2,k) is written at iteration i from B(i-2)*BM+...
+   * IVX(ivx_3,k) was written at i-1 from B(i-3); used as C3 (3-nt ending at i)
+   * IVX(ivx_4,k) was written at i-2 from B(i-4); used as C4 (4-nt ending at i)
+   *
+   * For C3: codon nucleotides are at i-2, i-1, i = v, w, x after window advance.
+   *----------------------------------------------------------------*/
+  for (i = 3; i <= L; i++)
+    {
+      v = w; w = x;
+      if (dsq[i] < p7P_MAXNUC) x = dsq[i]; else x = p7P_MAXNUC;
+
+      codon = p7P_CODON(v, w, x);
+      aa    = om->codons[ESL_MIN(codon, p7P_MAXCODONS - 1)];
+
+      curr  =     i               % PARSER_ROWS_FWD;
+      prev2 = ((i-2) % PARSER_ROWS_FWD + PARSER_ROWS_FWD) % PARSER_ROWS_FWD;
+      prev3 = ((i-3) % PARSER_ROWS_FWD + PARSER_ROWS_FWD) % PARSER_ROWS_FWD;
+
+      ivx_2 =     i               % p7P_3CODONS;
+      ivx_3 = ((i-1) % p7P_3CODONS + p7P_3CODONS) % p7P_3CODONS;
+      ivx_4 = ((i-2) % p7P_3CODONS + p7P_3CODONS) % p7P_3CODONS;
+
+      b  =     i               % PARSER_ROWS_FWD;
+      b2 = ((i-2) % PARSER_ROWS_FWD + PARSER_ROWS_FWD) % PARSER_ROWS_FWD;
+      b3 = ((i-3) % PARSER_ROWS_FWD + PARSER_ROWS_FWD) % PARSER_ROWS_FWD;
+
+      dpc  = ox->dpf[curr];
+      dpp2 = ox->dpf[prev2];
+      dpp3 = ox->dpf[prev3];
+
+      mpv2 = esl_sse_rightshiftz_float(MMO(dpp2, Q-1));
+      dpv2 = esl_sse_rightshiftz_float(DMO(dpp2, Q-1));
+      ipv2 = esl_sse_rightshiftz_float(IMO(dpp2, Q-1));
+
+      xBv2 = _mm_set1_ps(xB_buf[b2]);
+      tp   = om->tfv;
+      dcv  = zerov;
+      xEv  = zerov;
+
+      for (q = 0; q < Q; q++)
+        {
+          sv  =                _mm_mul_ps(xBv2, *tp); tp++;
+          sv  = _mm_add_ps(sv, _mm_mul_ps(mpv2, *tp)); tp++;
+          sv  = _mm_add_ps(sv, _mm_mul_ps(ipv2, *tp)); tp++;
+          sv  = _mm_add_ps(sv, _mm_mul_ps(dpv2, *tp)); tp++;
+          IVX(ivx_2, q) = sv;
+
+          msv =                _mm_mul_ps(sv,              quasi_codon_v);
+          msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_3, q), _mm_mul_ps(om->rfv[aa][q], real_codon_v)));
+          msv = _mm_add_ps(msv, _mm_mul_ps(IVX(ivx_4, q), quasi_codon_v));
+          xEv = _mm_add_ps(xEv, msv);
+
+          mpv2 = MMO(dpp2, q);
+          dpv2 = DMO(dpp2, q);
+          ipv2 = IMO(dpp2, q);
+
+          MMO(dpc, q) = msv;
+          DMO(dpc, q) = dcv;
+          dcv = _mm_mul_ps(msv, *tp); tp++;
+
+          sv          =                _mm_mul_ps(MMO(dpp3, q), *tp); tp++;
+          IMO(dpc, q) = _mm_add_ps(sv, _mm_mul_ps(IMO(dpp3, q), *tp)); tp++;
+        }
+
+      /* DD paths */
+      dcv        = esl_sse_rightshiftz_float(dcv);
+      DMO(dpc,0) = zerov;
+      tp         = om->tfv + 7*Q;
+      for (q = 0; q < Q; q++)
+        {
+          DMO(dpc, q) = _mm_add_ps(dcv, DMO(dpc, q));
+          dcv         = _mm_mul_ps(DMO(dpc, q), *tp); tp++;
+        }
+      if (om->M < 100)
+        {
+          for (j = 1; j < 4; j++)
+            {
+              dcv = esl_sse_rightshiftz_float(dcv);
+              tp  = om->tfv + 7*Q;
+              for (q = 0; q < Q; q++)
+                {
+                  DMO(dpc, q) = _mm_add_ps(dcv, DMO(dpc, q));
+                  dcv         = _mm_mul_ps(dcv, *tp); tp++;
+                }
+            }
+        }
+      else
+        {
+          for (j = 1; j < 4; j++)
+            {
+              register __m128 cv;
+              dcv = esl_sse_rightshiftz_float(dcv);
+              tp  = om->tfv + 7*Q;
+              cv  = zerov;
+              for (q = 0; q < Q; q++)
+                {
+                  sv          = _mm_add_ps(dcv, DMO(dpc, q));
+                  cv          = _mm_or_ps(cv, _mm_cmpgt_ps(sv, DMO(dpc, q)));
+                  DMO(dpc, q) = sv;
+                  dcv         = _mm_mul_ps(dcv, *tp); tp++;
+                }
+              if (! _mm_movemask_ps(cv)) break;
+            }
+        }
+
+      for (q = 0; q < Q; q++) xEv = _mm_add_ps(DMO(dpc, q), xEv);
+      xEv = _mm_add_ps(xEv, _mm_shuffle_ps(xEv, xEv, _MM_SHUFFLE(0, 3, 2, 1)));
+      xEv = _mm_add_ps(xEv, _mm_shuffle_ps(xEv, xEv, _MM_SHUFFLE(1, 0, 3, 2)));
+      _mm_store_ss(&xE, xEv);
+
+      xN = xN_buf[b3] * om->xf[p7O_N][p7O_LOOP];
+      xJ = xJ_buf[b3] * om->xf[p7O_J][p7O_LOOP] + xE * om->xf[p7O_E][p7O_LOOP];
+      xC = xC_buf[b3] * om->xf[p7O_C][p7O_LOOP] + xE * om->xf[p7O_E][p7O_MOVE];
+      xB = xN         * om->xf[p7O_N][p7O_MOVE]  + xJ * om->xf[p7O_J][p7O_MOVE];
+
+      if (xE > 1.0e4f)
+        {
+          float scale_factor = 1.0f / xE;
+          xN *= scale_factor; xJ *= scale_factor; xC *= scale_factor; xB *= scale_factor;
+          xEv = _mm_set1_ps(scale_factor);
+          for (r = 0; r < PARSER_ROWS_FWD; r++)
+            for (q = 0; q < Q; q++)
+              {
+                MMO(ox->dpf[r], q) = _mm_mul_ps(MMO(ox->dpf[r], q), xEv);
+                DMO(ox->dpf[r], q) = _mm_mul_ps(DMO(ox->dpf[r], q), xEv);
+                IMO(ox->dpf[r], q) = _mm_mul_ps(IMO(ox->dpf[r], q), xEv);
+              }
+          for (r = 0; r < p7P_3CODONS; r++)
+            for (q = 0; q < Q; q++)
+              IVX(r, q) = _mm_mul_ps(IVX(r, q), xEv);
+          for (r = 0; r < PARSER_ROWS_FWD; r++)
+            {
+              xN_buf[r] *= scale_factor; xB_buf[r] *= scale_factor;
+              xJ_buf[r] *= scale_factor; xC_buf[r] *= scale_factor;
+            }
+          ox->xmx[i*p7X_NXCELLS+p7X_SCALE] = xE;
+          ox->totscale += log(xE);
+          xE = 1.0f;
+        }
+      else ox->xmx[i*p7X_NXCELLS+p7X_SCALE] = 1.0f;
+
+      xN_buf[b] = xN; xB_buf[b] = xB; xJ_buf[b] = xJ; xC_buf[b] = xC;
+      ox->xmx[i*p7X_NXCELLS+p7X_E] = xE;
+      ox->xmx[i*p7X_NXCELLS+p7X_N] = xN;
+      ox->xmx[i*p7X_NXCELLS+p7X_J] = xJ;
+      ox->xmx[i*p7X_NXCELLS+p7X_B] = xB;
+      ox->xmx[i*p7X_NXCELLS+p7X_C] = xC;
+    } /* end main loop i=3..L */
+
+  {
+    float xCL   = xC_buf[   L    % PARSER_ROWS_FWD];
+    float xCLm1 = xC_buf[((L-1) % PARSER_ROWS_FWD + PARSER_ROWS_FWD) % PARSER_ROWS_FWD];
+    float xCLm2 = xC_buf[((L-2) % PARSER_ROWS_FWD + PARSER_ROWS_FWD) % PARSER_ROWS_FWD];
+    float xCtot = xCL
+                + xCLm1 * om->xf[p7O_C][p7O_LOOP]
+                + xCLm2 * om->xf[p7O_C][p7O_LOOP];
+
+    if      (isnan(xCtot))           ESL_EXCEPTION(eslERANGE, "forward score is NaN");
+    else if (isinf(xCtot) == 1)      ESL_EXCEPTION(eslERANGE, "forward score overflow (is infinity)");
+    else if (L > 2 && xCtot == 0.0f) {
+      if (opt_sc != NULL) *opt_sc = -eslINFINITY;
+      free(ivxf_mem);
+      return eslERANGE;
+    }
+
+    if (opt_sc != NULL)
+      *opt_sc = ox->totscale + logf(xCtot * om->xf[p7O_C][p7O_MOVE]);
+  }
+
+  free(ivxf_mem);
+  return eslOK;
+
+ ERROR:
+  if (ivxf_mem) free(ivxf_mem);
+  return status;
+}
+
 
 /* Function:  p7_BackwardParser_Frameshift_3Codons()
  * Synopsis:  SSE-accelerated frameshift-aware Backward algorithm, 3 codon lengths, linear memory.
@@ -1003,7 +1409,7 @@ p7_BackwardParser_Frameshift_3Codons(const ESL_DSQ *dsq, int L, const P7_FS_OPRO
   bck->xmx[p7X_SCALE] = 1.0f;
 
 #if eslDEBUGLEVEL > 0
-      if (bck->debugging) p7_omx_DumpFBRow_FS(bck, TRUE, 0, 0, 9, 4, xE, xN, xJ, xB, xC); 
+      if (bck->debugging) p7_omx_DumpFBRow_FS(bck, TRUE, 0, 0, 9, 4, xE, xN, xJ, xB, xC);
 #endif
 
  /* Final score: log( N(0) + N(1) + N(2) ) + totscale.
@@ -1034,6 +1440,426 @@ p7_BackwardParser_Frameshift_3Codons(const ESL_DSQ *dsq, int L, const P7_FS_OPRO
   return status;
 }
 
+
+/* Function:  p7_BackwardParser_Frameshift_3Codons_New
+ * Synopsis:  SSE Backward parser with new P7_PROFILE-based codon scoring, 3 codon lengths, linear memory.
+ *
+ * Purpose:   As p7_BackwardParser_Frameshift_3Codons(), but uses the new codon
+ *            scoring approach: C3 (in-frame 3-nt codon) is scored via standard
+ *            AA match emissions from <om->rfv> times a real-codon probability
+ *            constant; C2/C4 quasi-codons use only a flat frameshift probability
+ *            constant (no nucleotide emission term).
+ *
+ * Args:      dsq    - nucleotide sequence in digitized form, 1..L
+ *            L      - length of dsq
+ *            om     - optimized profile (must have om->codons, om->fsprob set)
+ *            fwd    - filled Forward DP matrix, for sparse scale factors
+ *            bck    - RETURN: Backward DP matrix (PARSER_ROWS_BWD MDI rows, L X rows)
+ *            opt_sc - optRETURN: Backward score in nats
+ *
+ * Returns:   <eslOK> on success.
+ * Throws:    <eslERANGE> if score overflows or underflows.
+ */
+int
+p7_BackwardParser_Frameshift_3Codons_New(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, const P7_OMX *fwd, P7_OMX *bck, float *opt_sc)
+{
+  register __m128 sv;
+  register __m128 dcv;
+  register __m128 ivx_carry;
+  __m128   tmmv, timv, tdmv;
+  register __m128 xBv;
+  register __m128 xEv;
+  __m128   zerov;
+  float    xN, xE, xB, xC, xJ;
+  float    xN_buf[PARSER_ROWS_BWD];
+  float    xB_buf[PARSER_ROWS_BWD];
+  float    xJ_buf[PARSER_ROWS_BWD];
+  float    xC_buf[PARSER_ROWS_BWD];
+  int      b, b3;
+  int      curr, prev2, prev3, prev4;
+  __m128  *dpc, *dpp2, *dpp3, *dpp4;
+  __m128  *tp7;
+  __m128  *tp_dd;
+  __m128  *tp_mm;
+  __m128  *ivxf     = NULL;
+  __m128  *ivxf_mem = NULL;
+  int      Q = p7O_NQF(om->M);
+  int      i, q, j, r;
+  int      v, w, x;               /* rolling nucleotide window: x=dsq[i+1], w=dsq[i+2], v=dsq[i+3] */
+  int      codon, aa;
+  float    scale;
+  int      status;
+
+  /* Frameshift probability constants (probability space).
+   * C2/C4 quasi-codons share a flat penalty; only C3 (in-frame 3-nt codon)
+   * uses the complementary real_codon weight with AA emission. */
+  __m128  quasi_codon_v = _mm_set1_ps(om->fsprob);
+  __m128  real_codon_v  = _mm_set1_ps(1.0f - om->fsprob * 4.0f);
+
+  bck->M              = om->M;
+  bck->L              = L;
+  bck->has_own_scales = FALSE;
+  bck->totscale       = 0.0;
+  zerov = _mm_setzero_ps();
+
+  ESL_ALLOC(ivxf_mem, sizeof(__m128) * Q + 15);
+  ivxf = (__m128 *) (((unsigned long int) ivxf_mem + 15) & (~0xf));
+
+  for (r = 0; r < PARSER_ROWS_BWD; r++)
+    for (q = 0; q < Q; q++)
+      MMO(bck->dpf[r],q) = IMO(bck->dpf[r],q) = DMO(bck->dpf[r],q) = zerov;
+
+  for (r = 0; r < PARSER_ROWS_BWD; r++)
+    xN_buf[r] = xB_buf[r] = xJ_buf[r] = xC_buf[r] = 0.0f;
+
+  /*----------------------------------------------------------------
+   * Initialization: rows L and L-1
+   * C(L)=T_CM. C(L-1)=T_CL*T_CM. J=B=N=0. E=C*T_EM. MDI: M=D=xE, I=0.
+   *----------------------------------------------------------------*/
+  for (i = L; i >= L-1; i--)
+    {
+      b   = i % PARSER_ROWS_BWD;
+      curr = b;
+
+      if      (i == L)   xC = om->xf[p7O_C][p7O_MOVE];
+      else if (i == L-1) xC = om->xf[p7O_C][p7O_LOOP] * om->xf[p7O_C][p7O_MOVE];
+
+      xN = xB = xJ = 0.0f;
+      xE = xC * om->xf[p7O_E][p7O_MOVE];
+      xEv = _mm_set1_ps(xE);
+
+      dpc = bck->dpf[curr];
+      for (q = 0; q < Q; q++)
+        { MMO(dpc,q) = xEv; DMO(dpc,q) = xEv; IMO(dpc,q) = zerov; }
+
+      dcv    = esl_sse_leftshiftz_float(DMO(dpc,0));
+      tp_dd  = om->tfv + 8*Q - 1;
+      for (q = Q-1; q >= 0; q--)
+        { sv = _mm_mul_ps(dcv, *tp_dd); tp_dd--;
+          DMO(dpc,q) = _mm_add_ps(DMO(dpc,q), sv); dcv = DMO(dpc,q); }
+      dcv = sv;
+      for (j = 1; j < 4; j++)
+        { dcv   = esl_sse_leftshiftz_float(dcv);
+          tp_dd = om->tfv + 8*Q - 1;
+          for (q = Q-1; q >= 0; q--)
+            { sv = _mm_mul_ps(dcv, *tp_dd); tp_dd--;
+              DMO(dpc,q) = _mm_add_ps(DMO(dpc,q), sv);
+              dcv = _mm_mul_ps(dcv, *(tp_dd+1)); } }
+
+      dcv  = esl_sse_leftshiftz_float(DMO(dpc,0));
+      tp7  = om->tfv + 7*Q - 3;
+      for (q = Q-1; q >= 0; q--)
+        { MMO(dpc,q) = _mm_add_ps(MMO(dpc,q), _mm_mul_ps(dcv, *tp7)); tp7 -= 7;
+          dcv = DMO(dpc,q); }
+
+      scale = fwd->xmx[i*p7X_NXCELLS+p7X_SCALE];
+      bck->xmx[i*p7X_NXCELLS+p7X_SCALE] = scale;
+      if (scale > 1.0f)
+        { float sf = 1.0f / scale;
+          xN *= sf; xJ *= sf; xC *= sf; xB *= sf; xE *= sf;
+          xEv = _mm_set1_ps(sf);
+          for (r = 0; r < PARSER_ROWS_BWD; r++)
+            for (q = 0; q < Q; q++)
+              { MMO(bck->dpf[r],q) = _mm_mul_ps(MMO(bck->dpf[r],q), xEv);
+                DMO(bck->dpf[r],q) = _mm_mul_ps(DMO(bck->dpf[r],q), xEv);
+                IMO(bck->dpf[r],q) = _mm_mul_ps(IMO(bck->dpf[r],q), xEv); }
+          bck->totscale += log(scale); }
+
+      xN_buf[b] = xN; xB_buf[b] = xB; xJ_buf[b] = xJ; xC_buf[b] = xC;
+      bck->xmx[i*p7X_NXCELLS+p7X_E] = xE;
+      bck->xmx[i*p7X_NXCELLS+p7X_N] = xN;
+      bck->xmx[i*p7X_NXCELLS+p7X_J] = xJ;
+      bck->xmx[i*p7X_NXCELLS+p7X_B] = xB;
+      bck->xmx[i*p7X_NXCELLS+p7X_C] = xC;
+    }
+
+  /*----------------------------------------------------------------
+   * Initialization: row L-2
+   * Only C2 (2-nt quasi-codon) contributes from M(L); C3/C4 rows are zero.
+   * ivxf[q] = M(L,q) * quasi_codon_v
+   *----------------------------------------------------------------*/
+  /* Initialize nucleotide window. In backward, x=dsq[i+1], w=dsq[i+2], v=dsq[i+3].
+   * At i=L-2: i+1=L-1, i+2=L, i+3=L+1 (beyond end → sentinel). */
+  v = p7P_MAXNUC;
+  if (dsq[L]   < p7P_MAXNUC) w = dsq[L];   else w = p7P_MAXNUC;
+  if (dsq[L-1] < p7P_MAXNUC) x = dsq[L-1]; else x = p7P_MAXNUC;
+
+  i    = L-2;
+  b    = i % PARSER_ROWS_BWD;
+  curr =  i    % PARSER_ROWS_BWD;
+  prev2 = (i+2) % PARSER_ROWS_BWD;   /* = L % PARSER_ROWS_BWD */
+
+  dpc  = bck->dpf[curr];
+  dpp2 = bck->dpf[prev2];
+
+  /* ivxf[q] = M(i+2=L, q) * quasi_codon_v  (C2 only; no codon lookup needed) */
+  for (q = 0; q < Q; q++)
+    ivxf[q] = _mm_mul_ps(MMO(dpp2,q), quasi_codon_v);
+
+  xBv = zerov;
+  tp7 = om->tfv;
+  for (q = 0; q < Q; q++) { xBv = _mm_add_ps(xBv, _mm_mul_ps(ivxf[q], *tp7)); tp7 += 7; }
+  xBv = _mm_add_ps(xBv, _mm_shuffle_ps(xBv, xBv, _MM_SHUFFLE(0,3,2,1)));
+  xBv = _mm_add_ps(xBv, _mm_shuffle_ps(xBv, xBv, _MM_SHUFFLE(1,0,3,2)));
+  _mm_store_ss(&xB, xBv);
+
+  xC = om->xf[p7O_C][p7O_LOOP] * om->xf[p7O_C][p7O_MOVE];
+  xJ = xB * om->xf[p7O_J][p7O_MOVE];
+  xN = xB * om->xf[p7O_N][p7O_MOVE];
+  xE = xJ * om->xf[p7O_E][p7O_LOOP] + xC * om->xf[p7O_E][p7O_MOVE];
+  xEv = _mm_set1_ps(xE);
+
+  for (q = 0; q < Q; q++) { MMO(dpc,q) = xEv; DMO(dpc,q) = xEv; IMO(dpc,q) = zerov; }
+
+  ivx_carry = esl_sse_leftshiftz_float(ivxf[0]);
+  tmmv = esl_sse_leftshiftz_float(*(om->tfv+1));
+  timv = esl_sse_leftshiftz_float(*(om->tfv+2));
+  tdmv = esl_sse_leftshiftz_float(*(om->tfv+3));
+  tp_mm = om->tfv;
+  for (q = Q-1; q >= 0; q--)
+    { MMO(dpc,q) = _mm_add_ps(MMO(dpc,q), _mm_mul_ps(ivx_carry, tmmv));
+      IMO(dpc,q) = _mm_add_ps(IMO(dpc,q), _mm_mul_ps(ivx_carry, timv));
+      DMO(dpc,q) = _mm_add_ps(DMO(dpc,q), _mm_mul_ps(ivx_carry, tdmv));
+      ivx_carry  = ivxf[q];
+      tp_mm = (tp_mm == om->tfv) ? om->tfv + 7*(Q-1) : tp_mm - 7;
+      tmmv = *(tp_mm+1);
+      timv = *(tp_mm+2);
+      tdmv = *(tp_mm+3); }
+
+  dcv   = esl_sse_leftshiftz_float(DMO(dpc,0));
+  tp_dd = om->tfv + 8*Q - 1;
+  for (q = Q-1; q >= 0; q--)
+    { sv = _mm_mul_ps(dcv, *tp_dd); tp_dd--;
+      DMO(dpc,q) = _mm_add_ps(DMO(dpc,q), sv); dcv = DMO(dpc,q); }
+  dcv = sv;
+  for (j = 1; j < 4; j++)
+    { dcv = esl_sse_leftshiftz_float(dcv); tp_dd = om->tfv + 8*Q - 1;
+      for (q = Q-1; q >= 0; q--)
+        { sv = _mm_mul_ps(dcv, *tp_dd); tp_dd--;
+          DMO(dpc,q) = _mm_add_ps(DMO(dpc,q), sv);
+          dcv = _mm_mul_ps(dcv, *(tp_dd+1)); } }
+  dcv = esl_sse_leftshiftz_float(DMO(dpc,0));
+  tp7 = om->tfv + 7*Q - 3;
+  for (q = Q-1; q >= 0; q--)
+    { MMO(dpc,q) = _mm_add_ps(MMO(dpc,q), _mm_mul_ps(dcv, *tp7)); tp7 -= 7;
+      dcv = DMO(dpc,q); }
+
+  scale = fwd->xmx[i*p7X_NXCELLS+p7X_SCALE];
+  bck->xmx[i*p7X_NXCELLS+p7X_SCALE] = scale;
+  if (scale > 1.0f)
+    { float sf = 1.0f / scale;
+      xN *= sf; xJ *= sf; xC *= sf; xB *= sf; xE *= sf;
+      xEv = _mm_set1_ps(sf);
+      for (r = 0; r < PARSER_ROWS_BWD; r++)
+        for (q = 0; q < Q; q++)
+          { MMO(bck->dpf[r],q) = _mm_mul_ps(MMO(bck->dpf[r],q), xEv);
+            DMO(bck->dpf[r],q) = _mm_mul_ps(DMO(bck->dpf[r],q), xEv);
+            IMO(bck->dpf[r],q) = _mm_mul_ps(IMO(bck->dpf[r],q), xEv); }
+      for (r = 0; r < PARSER_ROWS_BWD; r++)
+        { xN_buf[r] *= sf; xB_buf[r] *= sf; xJ_buf[r] *= sf; xC_buf[r] *= sf; }
+      bck->totscale += log(scale); }
+
+  xN_buf[b] = xN; xB_buf[b] = xB; xJ_buf[b] = xJ; xC_buf[b] = xC;
+  bck->xmx[i*p7X_NXCELLS+p7X_E] = xE;
+  bck->xmx[i*p7X_NXCELLS+p7X_N] = xN;
+  bck->xmx[i*p7X_NXCELLS+p7X_J] = xJ;
+  bck->xmx[i*p7X_NXCELLS+p7X_B] = xB;
+  bck->xmx[i*p7X_NXCELLS+p7X_C] = xC;
+
+  /*----------------------------------------------------------------
+   * Main recurrence: i = L-3 down to 1
+   *
+   * ivxf[q] = M(i+2,q)*quasi_codon_v
+   *          + M(i+3,q)*rfv[aa][q]*real_codon_v   [C3: 3-nt codon at i+1..i+3]
+   *          + M(i+4,q)*quasi_codon_v
+   *
+   * Nucleotide window: x=dsq[i+1], w=dsq[i+2], v=dsq[i+3].
+   * C3 codon = p7P_CODON(x, w, v).
+   *----------------------------------------------------------------*/
+  for (i = L-3; i >= 1; i--)
+    {
+      v = w; w = x;
+      if (dsq[i+1] < p7P_MAXNUC) x = dsq[i+1]; else x = p7P_MAXNUC;
+
+      codon = p7P_CODON(x, w, v);
+      aa    = om->codons[ESL_MIN(codon, p7P_MAXCODONS - 1)];
+
+      curr  =  i       % PARSER_ROWS_BWD;
+      prev2 = (i+2)    % PARSER_ROWS_BWD;
+      prev3 = (i+3)    % PARSER_ROWS_BWD;
+      prev4 = (i+4)    % PARSER_ROWS_BWD;
+      b     =  i       % PARSER_ROWS_BWD;
+      b3    = (i+3)    % PARSER_ROWS_BWD;
+
+      dpc  = bck->dpf[curr];
+      dpp2 = bck->dpf[prev2];
+      dpp3 = bck->dpf[prev3];
+      dpp4 = bck->dpf[prev4];
+
+      /* Phase 1: ivxf[q] = M(i+2)*quasi + M(i+3)*rfv[aa]*real + M(i+4)*quasi */
+      for (q = 0; q < Q; q++)
+        ivxf[q] = _mm_add_ps(_mm_add_ps(
+                    _mm_mul_ps(MMO(dpp2,q), quasi_codon_v),
+                    _mm_mul_ps(MMO(dpp3,q), _mm_mul_ps(om->rfv[aa][q], real_codon_v))),
+                    _mm_mul_ps(MMO(dpp4,q), quasi_codon_v));
+
+      /* Phase 2: B(i) = sum_k ivxf[k] * BM(k-1) */
+      xBv = zerov;
+      tp7 = om->tfv;
+      for (q = 0; q < Q; q++) { xBv = _mm_add_ps(xBv, _mm_mul_ps(ivxf[q], *tp7)); tp7 += 7; }
+      xBv = _mm_add_ps(xBv, _mm_shuffle_ps(xBv, xBv, _MM_SHUFFLE(0,3,2,1)));
+      xBv = _mm_add_ps(xBv, _mm_shuffle_ps(xBv, xBv, _MM_SHUFFLE(1,0,3,2)));
+      _mm_store_ss(&xB, xBv);
+
+      /* Phase 3: special state recursions from i+3 buffers */
+      xC = xC_buf[b3] * om->xf[p7O_C][p7O_LOOP];
+      xJ = xJ_buf[b3] * om->xf[p7O_J][p7O_LOOP] + xB * om->xf[p7O_J][p7O_MOVE];
+      xN = xN_buf[b3] * om->xf[p7O_N][p7O_LOOP] + xB * om->xf[p7O_N][p7O_MOVE];
+      xE = xJ * om->xf[p7O_E][p7O_LOOP] + xC * om->xf[p7O_E][p7O_MOVE];
+      xEv = _mm_set1_ps(xE);
+
+      /* Phase 4a: initialize M=D=xE, I=0 */
+      for (q = 0; q < Q; q++)
+        { MMO(dpc,q) = xEv; DMO(dpc,q) = xEv; IMO(dpc,q) = zerov; }
+
+      /* Phase 4b: add I(i+3,k)*MI to M, I(i+3,k)*II to I */
+      tp7 = om->tfv;
+      for (q = 0; q < Q; q++)
+        { MMO(dpc,q) = _mm_add_ps(MMO(dpc,q), _mm_mul_ps(IMO(dpp3,q), *(tp7+5)));
+          IMO(dpc,q) = _mm_add_ps(IMO(dpc,q), _mm_mul_ps(IMO(dpp3,q), *(tp7+6)));
+          tp7 += 7; }
+
+      /* Phase 4c: add ivxf[k+1]*MM, ivxf[k+1]*IM, ivxf[k+1]*DM (backward pass) */
+      ivx_carry = esl_sse_leftshiftz_float(ivxf[0]);
+      tmmv = esl_sse_leftshiftz_float(*(om->tfv+1));
+      timv = esl_sse_leftshiftz_float(*(om->tfv+2));
+      tdmv = esl_sse_leftshiftz_float(*(om->tfv+3));
+      tp_mm = om->tfv;
+      for (q = Q-1; q >= 0; q--)
+        { MMO(dpc,q) = _mm_add_ps(MMO(dpc,q), _mm_mul_ps(ivx_carry, tmmv));
+          IMO(dpc,q) = _mm_add_ps(IMO(dpc,q), _mm_mul_ps(ivx_carry, timv));
+          DMO(dpc,q) = _mm_add_ps(DMO(dpc,q), _mm_mul_ps(ivx_carry, tdmv));
+          ivx_carry  = ivxf[q];
+          tp_mm = (tp_mm == om->tfv) ? om->tfv + 7*(Q-1) : tp_mm - 7;
+          tmmv = *(tp_mm+1);
+          timv = *(tp_mm+2);
+          tdmv = *(tp_mm+3); }
+
+      /* Phase 5: DD backward passes */
+      dcv   = esl_sse_leftshiftz_float(DMO(dpc,0));
+      tp_dd = om->tfv + 8*Q - 1;
+      for (q = Q-1; q >= 0; q--)
+        { sv = _mm_mul_ps(dcv, *tp_dd); tp_dd--;
+          DMO(dpc,q) = _mm_add_ps(DMO(dpc,q), sv); dcv = DMO(dpc,q); }
+      dcv = sv;
+      for (j = 1; j < 4; j++)
+        { dcv = esl_sse_leftshiftz_float(dcv); tp_dd = om->tfv + 8*Q - 1;
+          for (q = Q-1; q >= 0; q--)
+            { sv = _mm_mul_ps(dcv, *tp_dd); tp_dd--;
+              DMO(dpc,q) = _mm_add_ps(DMO(dpc,q), sv);
+              dcv = _mm_mul_ps(dcv, *(tp_dd+1)); } }
+
+      /* Phase 6: MD correction */
+      dcv = esl_sse_leftshiftz_float(DMO(dpc,0));
+      tp7 = om->tfv + 7*Q - 3;
+      for (q = Q-1; q >= 0; q--)
+        { MMO(dpc,q) = _mm_add_ps(MMO(dpc,q), _mm_mul_ps(dcv, *tp7)); tp7 -= 7;
+          dcv = DMO(dpc,q); }
+
+      /* Phase 7: sparse rescaling */
+      if (xB > 1.0e16f) bck->has_own_scales = TRUE;
+
+      if (bck->has_own_scales) scale = (xB > 1.0e4f) ? xB : 1.0f;
+      else                    scale = fwd->xmx[i*p7X_NXCELLS+p7X_SCALE];
+
+      bck->xmx[i*p7X_NXCELLS+p7X_SCALE] = scale;
+      if (scale > 1.0f)
+        { float sf = 1.0f / scale;
+          xN *= sf; xJ *= sf; xC *= sf; xB *= sf; xE *= sf;
+          xEv = _mm_set1_ps(sf);
+          for (r = 0; r < PARSER_ROWS_BWD; r++)
+            for (q = 0; q < Q; q++)
+              { MMO(bck->dpf[r],q) = _mm_mul_ps(MMO(bck->dpf[r],q), xEv);
+                DMO(bck->dpf[r],q) = _mm_mul_ps(DMO(bck->dpf[r],q), xEv);
+                IMO(bck->dpf[r],q) = _mm_mul_ps(IMO(bck->dpf[r],q), xEv); }
+          for (r = 0; r < PARSER_ROWS_BWD; r++)
+            { xN_buf[r] *= sf; xB_buf[r] *= sf; xJ_buf[r] *= sf; xC_buf[r] *= sf; }
+          bck->totscale += log(scale); }
+
+      xN_buf[b] = xN; xB_buf[b] = xB; xJ_buf[b] = xJ; xC_buf[b] = xC;
+      bck->xmx[i*p7X_NXCELLS+p7X_E] = xE;
+      bck->xmx[i*p7X_NXCELLS+p7X_N] = xN;
+      bck->xmx[i*p7X_NXCELLS+p7X_J] = xJ;
+      bck->xmx[i*p7X_NXCELLS+p7X_B] = xB;
+      bck->xmx[i*p7X_NXCELLS+p7X_C] = xC;
+    } /* end main loop i=L-3..1 */
+
+  /*----------------------------------------------------------------
+   * Termination: i=0
+   * ivxf[q] = M(2)*quasi + M(3)*rfv[aa]*real + M(4)*quasi
+   * C3 codon at positions 1,2,3 = x,w,v after window advance.
+   *----------------------------------------------------------------*/
+  v = w; w = x;
+  if (dsq[1] < p7P_MAXNUC) x = dsq[1]; else x = p7P_MAXNUC;
+
+  codon = p7P_CODON(x, w, v);
+  aa    = om->codons[ESL_MIN(codon, p7P_MAXCODONS - 1)];
+
+  prev2 = 2 % PARSER_ROWS_BWD;
+  prev3 = 3 % PARSER_ROWS_BWD;
+  prev4 = 4 % PARSER_ROWS_BWD;
+
+  dpp2 = bck->dpf[prev2];
+  dpp3 = bck->dpf[prev3];
+  dpp4 = bck->dpf[prev4];
+
+  for (q = 0; q < Q; q++)
+    ivxf[q] = _mm_add_ps(_mm_add_ps(
+                _mm_mul_ps(MMO(dpp2,q), quasi_codon_v),
+                _mm_mul_ps(MMO(dpp3,q), _mm_mul_ps(om->rfv[aa][q], real_codon_v))),
+                _mm_mul_ps(MMO(dpp4,q), quasi_codon_v));
+
+  xBv = zerov;
+  tp7 = om->tfv;
+  for (q = 0; q < Q; q++) { xBv = _mm_add_ps(xBv, _mm_mul_ps(ivxf[q], *tp7)); tp7 += 7; }
+  xBv = _mm_add_ps(xBv, _mm_shuffle_ps(xBv, xBv, _MM_SHUFFLE(0,3,2,1)));
+  xBv = _mm_add_ps(xBv, _mm_shuffle_ps(xBv, xBv, _MM_SHUFFLE(1,0,3,2)));
+  _mm_store_ss(&xB, xBv);
+
+  xN = xN_buf[3 % PARSER_ROWS_BWD] * om->xf[p7O_N][p7O_LOOP]
+     + xB                           * om->xf[p7O_N][p7O_MOVE];
+
+  bck->xmx[p7X_B]     = xB;
+  bck->xmx[p7X_N]     = xN;
+  bck->xmx[p7X_J]     = 0.0f;
+  bck->xmx[p7X_C]     = 0.0f;
+  bck->xmx[p7X_E]     = 0.0f;
+  bck->xmx[p7X_SCALE] = 1.0f;
+
+  {
+    float xNtot = xN
+                + xN_buf[1 % PARSER_ROWS_BWD]
+                + xN_buf[2 % PARSER_ROWS_BWD];
+
+    if      (isnan(xNtot))           ESL_EXCEPTION(eslERANGE, "backward score is NaN");
+    else if (isinf(xNtot) == 1)      ESL_EXCEPTION(eslERANGE, "backward score overflow (is infinity)");
+    else if (L > 0 && xNtot == 0.0f) {
+      if (opt_sc != NULL) *opt_sc = -eslINFINITY;
+      free(ivxf_mem);
+      return eslERANGE;
+    }
+
+    if (opt_sc != NULL)
+      *opt_sc = bck->totscale + logf(xNtot);
+  }
+
+  free(ivxf_mem);
+  return eslOK;
+
+ ERROR:
+  if (ivxf_mem) free(ivxf_mem);
+  return status;
+}
 
 
 /* Function:  p7_ForwardParser_Frameshift_5Codons()
